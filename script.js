@@ -187,57 +187,68 @@ async function takePhoto() {
 
     setStatus("Making your 3-photo collage...");
 
-    // Build the vertical collage
-    const w = photos[0].width;
-    const h = photos[0].height;
-    const margin = 24;
-    const gap = 16;
-    const footer = 180;
+    /* Build a compact photo booth strip */
+const w = photos[0].width;
+const h = photos[0].height;
 
-    const collage = document.createElement("canvas");
-    collage.width = w + margin * 2;
-    collage.height = margin * 2 + h * 3 + gap * 2 + footer;
+// Smaller margins and gaps
+const margin = 16;
+const gap = 8;
+const footer = 100;
 
-    const ctx = collage.getContext("2d");
-    ctx.fillStyle = "#FFF8F0";
-    ctx.fillRect(0, 0, collage.width, collage.height);
+// Each photo takes less vertical space
+const photoWidth = 480;
+const photoHeight = Math.round(photoWidth * h / w);
 
-    photos.forEach((photo, i) => {
-      ctx.drawImage(
-        photo,
-        margin,
-        margin + i * (h + gap),
-        w,
-        h
-      );
-    });
+const collage = document.createElement("canvas");
+collage.width = photoWidth + margin * 2;
+collage.height =
+  margin * 2 +
+  photoHeight * 3 +
+  gap * 2 +
+  footer;
 
-    // Footer text
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+const ctx = collage.getContext("2d");
 
-    const center = collage.width / 2;
-    const footerTop = margin * 2 + h * 3 + gap * 2;
+ctx.fillStyle = "#FFF8F0";
+ctx.fillRect(0, 0, collage.width, collage.height);
 
-    ctx.fillStyle = "#C16E65";
-    ctx.font = "bold 52px Arial";
-    ctx.fillText("SNAP & SMILE", center, footerTop + 45);
+photos.forEach((photo, i) => {
+  ctx.drawImage(
+    photo,
+    margin,
+    margin + i * (photoHeight + gap),
+    photoWidth,
+    photoHeight
+  );
+});
 
-    ctx.fillStyle = "#51413D";
-    ctx.font = "bold 28px Arial";
-    ctx.fillText(
-      "THREE SHOTS. ONE MEMORY.",
-      center,
-      footerTop + 100
-    );
+// Compact footer
+ctx.textAlign = "center";
+ctx.textBaseline = "middle";
 
-    ctx.fillStyle = "#8A7770";
-    ctx.font = "22px Arial";
-    ctx.fillText(
-      "PHOTO BOOTH • 2026",
-      center,
-      footerTop + 145
-    );
+const center = collage.width / 2;
+const footerTop = margin * 2 + photoHeight * 3 + gap * 2;
+
+ctx.fillStyle = "#C16E65";
+ctx.font = "bold 25px Arial";
+ctx.fillText("SNAP & SMILE", center, footerTop + 25);
+
+ctx.fillStyle = "#51413D";
+ctx.font = "bold 13px Arial";
+ctx.fillText(
+  "THREE SHOTS. ONE MEMORY.",
+  center,
+  footerTop + 52
+);
+
+ctx.fillStyle = "#8A7770";
+ctx.font = "11px Arial";
+ctx.fillText(
+  "PHOTO BOOTH • 2026",
+  center,
+  footerTop + 76
+);
 
     const blob = await new Promise(resolve =>
       collage.toBlob(resolve, "image/jpeg", 0.75)
