@@ -19,16 +19,13 @@ const startCameraButton = document.getElementById("startCamera");
 const takePhotoButton = document.getElementById("takePhoto");
 const startVideoButton = document.getElementById("startVideo");
 const stopVideoButton = document.getElementById("stopVideo");
-
 const placeholder = document.getElementById("cameraPlaceholder");
 const countdownDisplay = document.getElementById("countdown");
 const statusText = document.getElementById("status");
 const photoPreview = document.getElementById("photoPreview");
 const videoPreview = document.getElementById("videoPreview");
-
 const qrPanel = document.getElementById("qrPanel");
 const qrContainer = document.getElementById("qrcode");
-
 const boothPage = document.getElementById("boothPage");
 const galleryPage = document.getElementById("galleryPage");
 const galleryList = document.getElementById("galleryList");
@@ -40,8 +37,9 @@ const requestedSession = urlParams.get("session");
 
 const validSession =
   requestedSession &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-    .test(requestedSession);
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    requestedSession
+  );
 
 const sessionId = validSession
   ? requestedSession
@@ -54,10 +52,14 @@ let busy = false;
 let countdownRunning = false;
 let previewUrl = null;
 let uploadedFiles = 0;
+let recordingCanvasStream = null;
+let recordingAnimationId = null;
 
-// STEP 4: Update the status message.
+// STEP 4: Update status message.
 function setStatus(message) {
-  statusText.textContent = message;
+  if (statusText) {
+    statusText.textContent = message;
+  }
 }
 
 // STEP 5: Start the camera.
@@ -69,13 +71,18 @@ async function startCamera() {
       );
     }
 
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      cameraStream = null;
+    }
+
     setStatus("Opening camera...");
 
     cameraStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
-        width: { ideal: 1280 },
-        height: { ideal: 960 }
+        width: { ideal: 1920 },
+        height: { ideal: 1440 }
       },
       audio: true
     });
@@ -83,47 +90,53 @@ async function startCamera() {
     camera.srcObject = cameraStream;
     await camera.play();
 
-    placeholder.classList.add("hidden");
+    placeholder?.classList.add("hidden");
     takePhotoButton.disabled = false;
     startVideoButton.disabled = false;
 
     setStatus("Camera ready! Smile for the camera.");
   } catch (error) {
-    console.error(error);
+    console.error("Camera error:", error);
+
     setStatus(
       "Camera could not start. Allow camera and microphone access and use HTTPS."
     );
   }
 }
 
-// STEP 6: Countdown before taking a photo.
+// STEP 6: Countdown helper.
 async function runCountdown() {
-  const seconds = Number(
-    document.getElementById("timerSelect").value
-  );
+  const timerSelect = document.getElementById("timerSelect");
+  const seconds = Number(timerSelect?.value || 0);
 
   if (seconds === 0) return;
 
   countdownRunning = true;
-  countdownDisplay.classList.remove("hidden");
+  countdownDisplay?.classList.remove("hidden");
 
   try {
     for (let number = seconds; number > 0; number--) {
       countdownDisplay.textContent = number;
 
-      await new Promise(resolve =>
-        setTimeout(resolve, 1000)
-      );
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   } finally {
-    countdownDisplay.classList.add("hidden");
+    countdownDisplay?.classList.add("hidden");
     countdownRunning = false;
   }
 }
 
-// STEP 7: Take a photo.
+// STEP 7: Take three photos and build a high-resolution photostrip.
 async function takePhoto() {
-  if (!cameraStream || busy || countdownRunning) return;
+  if (
+    !cameraStream ||
+    busy ||
+    countdownRunning ||
+    !camera.videoWidth ||
+    !camera.videoHeight
+  ) {
+    return;
+  }
 
   takePhotoButton.disabled = true;
   startVideoButton.disabled = true;
@@ -131,19 +144,20 @@ async function takePhoto() {
   try {
     const photos = [];
     const timer = Number(
-      document.getElementById("timerSelect").value
+      document.getElementById("timerSelect")?.value || 0
     );
 
     for (let i = 0; i < 3; i++) {
       setStatus(`Get ready! Photo ${i + 1} of 3`);
 
-      // Countdown before EACH shot
+      // Countdown before each shot.
       if (timer > 0) {
         countdownRunning = true;
         countdownDisplay.classList.remove("hidden");
 
         for (let n = timer; n > 0; n--) {
           countdownDisplay.textContent = n;
+
           await new Promise(resolve =>
             setTimeout(resolve, 1000)
           );
@@ -153,13 +167,20 @@ async function takePhoto() {
         countdownRunning = false;
       }
 
-      // Capture this shot
+      // Capture at the actual camera resolution.
       const canvas = document.createElement("canvas");
       canvas.width = camera.videoWidth;
       canvas.height = camera.videoHeight;
 
-      const photoContext = canvas.getContext("2d");
+      const photoContext = canvas.getContext("2d", {
+        alpha: false
+      });
 
+      if (!photoContext) {
+        throw new Error("Could not create the photo canvas.");
+      }
+
+      // Mirror the selfie horizontally.
       photoContext.save();
       photoContext.translate(canvas.width, 0);
       photoContext.scale(-1, 1);
@@ -173,132 +194,144 @@ async function takePhoto() {
       );
 
       photoContext.restore();
-
       photos.push(canvas);
 
-      // Pause so the next picture is a separate moment
+      // Give guests time between photos.
       if (i < 2) {
         setStatus(`Photo ${i + 1} captured!`);
+
         await new Promise(resolve =>
           setTimeout(resolve, 1200)
         );
       }
     }
 
-    setStatus("Making your 3-photo collage...");
+    setStatus("Creating your high-quality wedding photostrip...");
 
-/* BUILD PHOTO BOOTH STRIP — 4:3 PHOTOS */
+    // HIGH-RESOLUTION PHOTO STRIP SETTINGS.
+    // Each photo is exported at 1080 x 810 pixels.
+    const photoWidth = 1080;
+    const photoHeight = 810;
+    const margin = 36;
+    const gap = 24;
+    const footer = 270;
 
-const photoWidth = 360;
-const photoHeight = 270;
+    const collage = document.createElement("canvas");
 
-const margin = 12;
-const gap = 8;
-const footer = 90;
+    collage.width = photoWidth + margin * 2;
+    collage.height =
+      margin * 2 +
+      photoHeight * 3 +
+      gap * 2 +
+      footer;
 
-const collage = document.createElement("canvas");
+    const ctx = collage.getContext("2d", {
+      alpha: false
+    });
 
-collage.width = photoWidth + margin * 2;
-collage.height =
-  margin * 2 +
-  photoHeight * 3 +
-  gap * 2 +
-  footer;
+    if (!ctx) {
+      throw new Error("Could not create the photostrip.");
+    }
 
-const ctx = collage.getContext("2d");
+    // Improve image resampling quality.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
-// Background
-ctx.fillStyle = "#FFF8F0";
-ctx.fillRect(0, 0, collage.width, collage.height);
+    // Warm white wedding background.
+    ctx.fillStyle = "#FFFDF9";
+    ctx.fillRect(0, 0, collage.width, collage.height);
 
-// Add all three photos without stretching
-photos.forEach((photo, i) => {
-  const sourceWidth = photo.width;
-  const sourceHeight = photo.height;
-  const targetRatio = 4 / 3;
-  const sourceRatio = sourceWidth / sourceHeight;
+    // Draw all three photos without stretching.
+    photos.forEach((photo, i) => {
+      const sourceWidth = photo.width;
+      const sourceHeight = photo.height;
+      const targetRatio = 4 / 3;
+      const sourceRatio = sourceWidth / sourceHeight;
 
-  let cropX = 0;
-  let cropY = 0;
-  let cropWidth = sourceWidth;
-  let cropHeight = sourceHeight;
+      let cropX = 0;
+      let cropY = 0;
+      let cropWidth = sourceWidth;
+      let cropHeight = sourceHeight;
 
-  // Centre-crop to 4:3 only when necessary
-  if (sourceRatio > targetRatio) {
-    cropWidth = sourceHeight * targetRatio;
-    cropX = (sourceWidth - cropWidth) / 2;
-  } else if (sourceRatio < targetRatio) {
-    cropHeight = sourceWidth / targetRatio;
-    cropY = (sourceHeight - cropHeight) / 2;
-  }
+      // Centre-crop only when the camera aspect ratio differs.
+      if (sourceRatio > targetRatio) {
+        cropWidth = sourceHeight * targetRatio;
+        cropX = (sourceWidth - cropWidth) / 2;
+      } else if (sourceRatio < targetRatio) {
+        cropHeight = sourceWidth / targetRatio;
+        cropY = (sourceHeight - cropHeight) / 2;
+      }
 
-  const y = margin + i * (photoHeight + gap);
+      const y = margin + i * (photoHeight + gap);
 
-  ctx.drawImage(
-    photo,
-    cropX,
-    cropY,
-    cropWidth,
-    cropHeight,
-    margin,
-    y,
-    photoWidth,
-    photoHeight
-  );
-});
+      ctx.drawImage(
+        photo,
+        cropX,
+        cropY,
+        cropWidth,
+        cropHeight,
+        margin,
+        y,
+        photoWidth,
+        photoHeight
+      );
+    });
 
-// Footer text
-ctx.textAlign = "center";
-ctx.textBaseline = "middle";
+    // Wedding footer.
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
 
-const center = collage.width / 2;
-const footerTop =
-  margin * 2 +
-  photoHeight * 3 +
-  gap * 2;
+    const center = collage.width / 2;
+    const footerTop =
+      margin * 2 +
+      photoHeight * 3 +
+      gap * 2;
 
-// Couple's names
-ctx.fillStyle = "#8A7358";
-ctx.font = "italic 24px Georgia";
-ctx.fillText(
-  "Syahlen & Tiqah",
-  center,
-  footerTop + 22
-);
-
-// Romantic message
-ctx.fillStyle = "#51413D";
-ctx.font = "11px Georgia";
-ctx.fillText(
-  "A DAY TO REMEMBER",
-  center,
-  footerTop + 49
-);
-
-// Wedding date
-ctx.fillStyle = "#8A7770";
-ctx.font = "10px Arial";
-ctx.fillText(
-  "08 AUGUST 2026",
-  center,
-  footerTop + 70
-);
-
-    const blob = await new Promise(resolve =>
-      collage.toBlob(resolve, "image/jpeg", 0.75)
+    // Couple's names.
+    ctx.fillStyle = "#8A7358";
+    ctx.font = "italic 72px Georgia";
+    ctx.fillText(
+      "Syahlen & Tiqah",
+      center,
+      footerTop + 66
     );
 
-    if (!blob) throw new Error("Could not create collage.");
+    // Wedding message.
+    ctx.fillStyle = "#51413D";
+    ctx.font = "33px Georgia";
+    ctx.fillText(
+      "A DAY TO REMEMBER",
+      center,
+      footerTop + 147
+    );
+
+    // Wedding date.
+    ctx.fillStyle = "#8A7770";
+    ctx.font = "30px Arial";
+    ctx.fillText(
+      "08 AUGUST 2026",
+      center,
+      footerTop + 213
+    );
+
+    // Export at high JPEG quality.
+    const blob = await new Promise(resolve => {
+      collage.toBlob(resolve, "image/jpeg", 0.95);
+    });
+
+    if (!blob) {
+      throw new Error("Could not create the high-quality photostrip.");
+    }
 
     showPreview(blob, "photo");
     await uploadMedia(blob, "jpg", "image/jpeg");
 
   } catch (error) {
-    console.error(error);
+    console.error("Photo error:", error);
     setStatus("Photo failed: " + error.message);
   } finally {
     countdownRunning = false;
-    countdownDisplay.classList.add("hidden");
+    countdownDisplay?.classList.add("hidden");
     takePhotoButton.disabled = false;
     startVideoButton.disabled = false;
   }
@@ -306,11 +339,13 @@ ctx.fillText(
 
 // STEP 8: Show a local preview.
 function showPreview(blob, type) {
-  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  if (previewUrl) {
+    URL.revokeObjectURL(previewUrl);
+  }
 
   previewUrl = URL.createObjectURL(blob);
 
-  document.getElementById("result").classList.remove("hidden");
+  document.getElementById("result")?.classList.remove("hidden");
 
   if (type === "photo") {
     photoPreview.src = previewUrl;
@@ -323,10 +358,7 @@ function showPreview(blob, type) {
   }
 }
 
-// STEP 9: Record a video.
-let recordingCanvasStream = null;
-let recordingAnimationId = null;
-
+// STEP 9: Record a mirrored video with microphone audio.
 function startRecording() {
   if (!cameraStream || busy || recorder) {
     return;
@@ -360,17 +392,14 @@ function startRecording() {
   try {
     recordedChunks = [];
 
-    // Create a canvas for mirrored video frames.
     const recordingCanvas = document.createElement("canvas");
     recordingCanvas.width = camera.videoWidth;
     recordingCanvas.height = camera.videoHeight;
 
     const ctx = recordingCanvas.getContext("2d");
 
-    // Capture the canvas as a video stream.
     recordingCanvasStream = recordingCanvas.captureStream(30);
 
-    // Combine mirrored video with microphone audio.
     const tracks = [
       ...recordingCanvasStream.getVideoTracks(),
       ...cameraStream.getAudioTracks()
@@ -385,6 +414,7 @@ function startRecording() {
 
       ctx.save();
       ctx.setTransform(-1, 0, 0, 1, recordingCanvas.width, 0);
+
       ctx.drawImage(
         camera,
         0,
@@ -392,13 +422,16 @@ function startRecording() {
         recordingCanvas.width,
         recordingCanvas.height
       );
+
       ctx.restore();
 
       recordingAnimationId =
         requestAnimationFrame(drawMirroredFrame);
     }
 
-    recorder = new MediaRecorder(recordingStream, { mimeType });
+    recorder = new MediaRecorder(recordingStream, {
+      mimeType
+    });
 
     recorder.ondataavailable = event => {
       if (event.data && event.data.size > 0) {
@@ -417,12 +450,12 @@ function startRecording() {
         recordingAnimationId = null;
       }
 
-      // Stop only the canvas video tracks.
-      // Keep the camera and microphone running.
+      // Stop canvas capture without stopping the camera.
       if (recordingCanvasStream) {
-        recordingCanvasStream.getVideoTracks().forEach(track => {
+        recordingCanvasStream.getTracks().forEach(track => {
           track.stop();
         });
+
         recordingCanvasStream = null;
       }
 
@@ -443,6 +476,7 @@ function startRecording() {
         }
 
         setStatus("Preparing your video...");
+
         showPreview(videoBlob, "video");
 
         await uploadMedia(
@@ -450,6 +484,7 @@ function startRecording() {
           videoExtension,
           mimeType
         );
+
       } catch (error) {
         console.error("Video processing error:", error);
         setStatus("Video failed: " + error.message);
@@ -461,7 +496,6 @@ function startRecording() {
       }
     };
 
-    // Start recording before drawing frames.
     recorder.start(1000);
     drawMirroredFrame();
 
@@ -484,6 +518,7 @@ function startRecording() {
       recordingCanvasStream.getTracks().forEach(track => {
         track.stop();
       });
+
       recordingCanvasStream = null;
     }
 
@@ -496,6 +531,7 @@ function startRecording() {
     }
 
     recorder = null;
+
     startVideoButton.disabled = false;
     takePhotoButton.disabled = false;
     stopVideoButton.disabled = false;
@@ -505,14 +541,11 @@ function startRecording() {
   }
 }
 
-/* STOP VIDEO RECORDING */
-
+// Stop video recording.
 function stopRecording(event) {
   if (event) {
     event.preventDefault();
   }
-
-  console.log("Stop Recording button clicked.");
 
   if (!recorder) {
     setStatus("No active recording was found.");
@@ -560,9 +593,12 @@ async function uploadMedia(blob, extension, contentType) {
     uploadedFiles++;
 
     setStatus("Upload complete! Your file is ready.");
+
     createQRCode();
+
   } catch (error) {
-    console.error(error);
+    console.error("Upload error:", error);
+
     setStatus(
       "Upload failed. Check your Supabase settings and internet connection."
     );
@@ -591,7 +627,7 @@ function createQRCode() {
 
   qrPanel.classList.remove("hidden");
 
-  document.getElementById("qrPanel").scrollIntoView({
+  qrPanel.scrollIntoView({
     behavior: "smooth",
     block: "nearest"
   });
@@ -610,7 +646,10 @@ async function loadGallery(id) {
       .from(BUCKET)
       .list(id, {
         limit: 100,
-        sortBy: { column: "created_at", order: "desc" }
+        sortBy: {
+          column: "created_at",
+          order: "desc"
+        }
       });
 
     if (error) throw error;
@@ -668,8 +707,10 @@ async function loadGallery(id) {
 
     galleryStatus.textContent =
       `${files.length} file(s) available. Enjoy your memories!`;
+
   } catch (error) {
-    console.error(error);
+    console.error("Gallery error:", error);
+
     galleryStatus.textContent =
       "Could not load the gallery. Check your connection or storage permissions.";
   }
@@ -681,8 +722,7 @@ takePhotoButton.addEventListener("click", takePhoto);
 startVideoButton.addEventListener("click", startRecording);
 stopVideoButton.addEventListener("click", stopRecording);
 
-// STEP 14: Decide whether to show the booth or a guest gallery.
+// STEP 14: Show the guest gallery when the URL has a valid session.
 if (validSession) {
   loadGallery(requestedSession);
 }
-
