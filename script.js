@@ -187,23 +187,11 @@ async function takePhoto() {
 
     setStatus("Making your 3-photo collage...");
 
-/* Build a compact 4:3 photo booth strip */
-
-const photoWidth = 360;
-const photoHeight = 200; // Exact 4:3 ratio
-
-const margin = 12;
-const gap = 8;
-const footer = 90;
+/* STORY-SIZE PHOTO BOOTH STRIP: 1080 x 1920 */
 
 const collage = document.createElement("canvas");
-
-collage.width = photoWidth + margin * 2;
-collage.height =
-  margin * 2 +
-  photoHeight * 3 +
-  gap * 2 +
-  footer;
+collage.width = 1080;
+collage.height = 1920;
 
 const ctx = collage.getContext("2d");
 
@@ -211,60 +199,65 @@ const ctx = collage.getContext("2d");
 ctx.fillStyle = "#FFF8F0";
 ctx.fillRect(0, 0, collage.width, collage.height);
 
-// Crop each photo to 4:3, like the camera preview
-photos.forEach((photo, i) => {
-  const sourceWidth = photo.width;
-  const sourceHeight = photo.height;
-  const targetRatio = 4 / 3;
-  const sourceRatio = sourceWidth / sourceHeight;
+// Three 4:3 photos, sized to fit a Story
+const photoWidth = 960;
+const photoHeight = 720;
+const margin = 60;
+const gap = 12;
+const footerTop = 1620;
 
-  let cropWidth = sourceWidth;
-  let cropHeight = sourceHeight;
-  let cropX = 0;
-  let cropY = 0;
+// Crop each image to 4:3, matching the camera preview
+photos.forEach((photo, i) => {
+  const sw = photo.width;
+  const sh = photo.height;
+  const targetRatio = 4 / 3;
+  const sourceRatio = sw / sh;
+
+  let sx = 0;
+  let sy = 0;
+  let sWidth = sw;
+  let sHeight = sh;
 
   if (sourceRatio > targetRatio) {
-    cropWidth = sourceHeight * targetRatio;
-    cropX = (sourceWidth - cropWidth) / 2;
+    sWidth = sh * targetRatio;
+    sx = (sw - sWidth) / 2;
   } else if (sourceRatio < targetRatio) {
-    cropHeight = sourceWidth / targetRatio;
-    cropY = (sourceHeight - cropHeight) / 2;
+    sHeight = sw / targetRatio;
+    sy = (sh - sHeight) / 2;
   }
-
-  const y = margin + i * (photoHeight + gap);
 
   ctx.drawImage(
     photo,
-    cropX, cropY, cropWidth, cropHeight,
-    margin, y, photoWidth, photoHeight
+    sx, sy, sWidth, sHeight,
+    margin,
+    margin + i * (photoHeight + gap),
+    photoWidth,
+    photoHeight
   );
 });
 
-// Footer
+// Story-friendly footer
 ctx.textAlign = "center";
 ctx.textBaseline = "middle";
 
-const center = collage.width / 2;
-const footerTop = margin * 2 + photoHeight * 3 + gap * 2;
-
 ctx.fillStyle = "#C16E65";
-ctx.font = "bold 24px Arial";
-ctx.fillText("SNAP & SMILE", center, footerTop + 20);
+ctx.font = "bold 64px Arial";
+ctx.fillText("SNAP & SMILE", 540, footerTop + 60);
 
 ctx.fillStyle = "#51413D";
-ctx.font = "bold 12px Arial";
+ctx.font = "bold 30px Arial";
 ctx.fillText(
   "THREE SHOTS. ONE MEMORY.",
-  center,
-  footerTop + 46
+  540,
+  footerTop + 130
 );
 
 ctx.fillStyle = "#8A7770";
-ctx.font = "10px Arial";
+ctx.font = "24px Arial";
 ctx.fillText(
   "PHOTO BOOTH • 2026",
-  center,
-  footerTop + 68
+  540,
+  footerTop + 185
 );
 
     const blob = await new Promise(resolve =>
