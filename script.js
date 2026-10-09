@@ -187,103 +187,84 @@ async function takePhoto() {
 
     setStatus("Making your 3-photo collage...");
 
-/* RESIZABLE PHOTO STRIP — EACH PHOTO REMAINS 4:3 */
+/* Build a compact 4:3 photo booth strip */
 
-// Change these two values to resize the whole strip
-const stripWidth = 600;
-const stripHeight = 1500;
+const photoWidth = 360;
+const photoHeight = 200; // Exact 4:3 ratio
+
+const margin = 12;
+const gap = 8;
+const footer = 90;
 
 const collage = document.createElement("canvas");
-collage.width = stripWidth;
-collage.height = stripHeight;
+
+collage.width = photoWidth + margin * 2;
+collage.height =
+  margin * 2 +
+  photoHeight * 3 +
+  gap * 2 +
+  footer;
 
 const ctx = collage.getContext("2d");
 
 // Background
 ctx.fillStyle = "#FFF8F0";
-ctx.fillRect(0, 0, stripWidth, stripHeight);
+ctx.fillRect(0, 0, collage.width, collage.height);
 
-// Layout settings
-const margin = 20;
-const gap = 12;
-const footerHeight = 100;
-
-// Calculate photo dimensions to fit the strip
-// while maintaining each photo's 4:3 ratio.
-const photoWidth = stripWidth - margin * 2;
-const photoHeight = photoWidth * 3 / 4;
-
-const availablePhotoHeight =
-  stripHeight - margin * 2 - footerHeight - gap * 2;
-
-const scale = Math.min(
-  1,
-  availablePhotoHeight / (photoHeight * 3)
-);
-
-const finalPhotoWidth = Math.round(photoWidth * scale);
-const finalPhotoHeight = Math.round(finalPhotoWidth * 3 / 4);
-
-const x = Math.round((stripWidth - finalPhotoWidth) / 2);
-const totalPhotosHeight =
-  finalPhotoHeight * 3 + gap * 2;
-
-const startY = margin;
-
-// Draw each photo with a centered 4:3 crop
+// Crop each photo to 4:3, like the camera preview
 photos.forEach((photo, i) => {
-  const sw = photo.width;
-  const sh = photo.height;
+  const sourceWidth = photo.width;
+  const sourceHeight = photo.height;
   const targetRatio = 4 / 3;
-  const sourceRatio = sw / sh;
+  const sourceRatio = sourceWidth / sourceHeight;
 
-  let sx = 0;
-  let sy = 0;
-  let sWidth = sw;
-  let sHeight = sh;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+  let cropX = 0;
+  let cropY = 0;
 
   if (sourceRatio > targetRatio) {
-    sWidth = sh * targetRatio;
-    sx = (sw - sWidth) / 2;
+    cropWidth = sourceHeight * targetRatio;
+    cropX = (sourceWidth - cropWidth) / 2;
   } else if (sourceRatio < targetRatio) {
-    sHeight = sw / targetRatio;
-    sy = (sh - sHeight) / 2;
+    cropHeight = sourceWidth / targetRatio;
+    cropY = (sourceHeight - cropHeight) / 2;
   }
+
+  const y = margin + i * (photoHeight + gap);
 
   ctx.drawImage(
     photo,
-    sx, sy, sWidth, sHeight,
-    x,
-    startY + i * (finalPhotoHeight + gap),
-    finalPhotoWidth,
-    finalPhotoHeight
+    cropX, cropY, cropWidth, cropHeight,
+    margin, y, photoWidth, photoHeight
   );
 });
 
-// Footer positioned at the bottom
+// Footer
 ctx.textAlign = "center";
 ctx.textBaseline = "middle";
 
-const footerTop = stripHeight - footerHeight;
+const center = collage.width / 2;
+const footerTop = margin * 2 + photoHeight * 3 + gap * 2;
 
 ctx.fillStyle = "#C16E65";
-ctx.font = `bold ${Math.max(18, stripWidth * 0.055)}px Arial`;
-ctx.fillText("SNAP & SMILE", stripWidth / 2, footerTop + 25);
+ctx.font = "bold 24px Arial";
+ctx.fillText("SNAP & SMILE", center, footerTop + 20);
 
 ctx.fillStyle = "#51413D";
-ctx.font = `bold ${Math.max(10, stripWidth * 0.027)}px Arial`;
+ctx.font = "bold 12px Arial";
 ctx.fillText(
   "THREE SHOTS. ONE MEMORY.",
-  stripWidth / 2,
-  footerTop + 55
+  center,
+  footerTop + 46
 );
 
 ctx.fillStyle = "#8A7770";
-ctx.font = ` ${Math.max(9, stripWidth * 0.022)}px Arial`;
+ctx.font = "10px Arial";
 ctx.fillText(
   "PHOTO BOOTH • 2026",
-  stripWidth / 2,
-  footerTop + 80
+  center,
+  footerTop + 68
 );
 
     const blob = await new Promise(resolve =>
