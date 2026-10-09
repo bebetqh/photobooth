@@ -933,9 +933,28 @@ async function loadGallery(id) {
 // startVideoButton.addEventListener("click", startRecording);
 // stopVideoButton.addEventListener("click", stopRecording);
 
-<button id="startCamera" type="button" class="button primary">
-  Start Camera
-</button>
+console.log("Snap & Smile JavaScript loaded");
+
+console.log("Start camera button:", startCameraButton);
+console.log("Camera element:", camera);
+
+if (startCameraButton) {
+  startCameraButton.addEventListener("click", () => {
+    console.log("Start Camera button clicked!");
+  });
+
+  startCameraButton.addEventListener("click", startCamera);
+} else {
+  console.error("ERROR: Start Camera button not found!");
+}
+
+takePhotoButton.addEventListener("click", takePhoto);
+startVideoButton.addEventListener("click", startRecording);
+stopVideoButton.addEventListener("click", stopRecording);
+
+if (validSession) {
+  loadGallery(requestedSession);
+}
 
 // STEP 14: Show the guest gallery when the URL has a valid session.
 if (validSession) {
