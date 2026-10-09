@@ -928,10 +928,14 @@ async function loadGallery(id) {
 }
 
 // STEP 13: Connect buttons.
-startCameraButton.addEventListener("click", startCamera);
-takePhotoButton.addEventListener("click", takePhoto);
-startVideoButton.addEventListener("click", startRecording);
-stopVideoButton.addEventListener("click", stopRecording);
+// startCameraButton.addEventListener("click", startCamera);
+// takePhotoButton.addEventListener("click", takePhoto);
+// startVideoButton.addEventListener("click", startRecording);
+// stopVideoButton.addEventListener("click", stopRecording);
+
+<button id="startCamera" type="button" class="button primary">
+  Start Camera
+</button>
 
 // STEP 14: Show the guest gallery when the URL has a valid session.
 if (validSession) {
