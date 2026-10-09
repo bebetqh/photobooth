@@ -240,7 +240,7 @@ async function takePhoto() {
     );
 
     const blob = await new Promise(resolve =>
-      collage.toBlob(resolve, "image/jpeg", 0.92)
+      collage.toBlob(resolve, "image/jpeg", 0.75)
     );
 
     if (!blob) throw new Error("Could not create collage.");
