@@ -190,7 +190,7 @@ async function takePhoto() {
 /* Build a compact 4:3 photo booth strip */
 
 const photoWidth = 360;
-const photoHeight = 270; // Exact 4:3 ratio
+const photoHeight = 200; // Exact 4:3 ratio
 
 const margin = 12;
 const gap = 8;
