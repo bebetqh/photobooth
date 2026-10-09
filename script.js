@@ -187,10 +187,10 @@ async function takePhoto() {
 
     setStatus("Making your 3-photo collage...");
 
-/* Build a compact 4:3 photo booth strip */
+/* BUILD PHOTO BOOTH STRIP — 4:3 PHOTOS */
 
 const photoWidth = 360;
-const photoHeight = 270; // Exact 4:3 ratio
+const photoHeight = 270;
 
 const margin = 12;
 const gap = 8;
@@ -211,18 +211,19 @@ const ctx = collage.getContext("2d");
 ctx.fillStyle = "#FFF8F0";
 ctx.fillRect(0, 0, collage.width, collage.height);
 
-// Crop each photo to 4:3, like the camera preview
+// Add all three photos without stretching
 photos.forEach((photo, i) => {
   const sourceWidth = photo.width;
   const sourceHeight = photo.height;
   const targetRatio = 4 / 3;
   const sourceRatio = sourceWidth / sourceHeight;
 
-  let cropWidth = sourceWidth;
-  let cropHeight = sourceHeight;
   let cropX = 0;
   let cropY = 0;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
 
+  // Centre-crop to 4:3 only when necessary
   if (sourceRatio > targetRatio) {
     cropWidth = sourceHeight * targetRatio;
     cropX = (sourceWidth - cropWidth) / 2;
@@ -235,17 +236,26 @@ photos.forEach((photo, i) => {
 
   ctx.drawImage(
     photo,
-    cropX, cropY, cropWidth, cropHeight,
-    margin, y, photoWidth, photoHeight
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    margin,
+    y,
+    photoWidth,
+    photoHeight
   );
 });
 
-// Footer
+// Footer text
 ctx.textAlign = "center";
 ctx.textBaseline = "middle";
 
 const center = collage.width / 2;
-const footerTop = margin * 2 + photoHeight * 3 + gap * 2;
+const footerTop =
+  margin * 2 +
+  photoHeight * 3 +
+  gap * 2;
 
 ctx.fillStyle = "#C16E65";
 ctx.font = "bold 24px Arial";
