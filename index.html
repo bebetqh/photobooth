@@ -106,5 +106,40 @@
   <footer>
     <p>Made with ♡ for your special moments</p>
   </footer>
+
+  <script>
+document.addEventListener("DOMContentLoaded", function () {
+  const button = document.getElementById("startCamera");
+  const status = document.getElementById("status");
+
+  if (!button) {
+    alert("ERROR: Start Camera button not found!");
+    return;
+  }
+
+  button.addEventListener("click", async function () {
+    alert("Button works! Now testing camera...");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+
+      const video = document.getElementById("camera");
+      video.srcObject = stream;
+      await video.play();
+
+      document.getElementById("cameraPlaceholder").style.display = "none";
+      status.textContent = "Camera is working! ❤️";
+
+    } catch (error) {
+      alert("Camera error: " + error.name + " — " + error.message);
+      status.textContent = "Camera error: " + error.name;
+    }
+  });
+});
+</script>
+  
 </body>
 </html>
