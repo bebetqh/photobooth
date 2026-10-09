@@ -740,6 +740,89 @@ function createQRCode() {
 }
 
 // STEP 12: Load the gallery on a guest's phone.
+// Save a photo or video on the guest's device.
+async function saveGalleryFile(url, fileName, isVideo) {
+  try {
+    galleryStatus.textContent = "Preparing your file...";
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(
+        `Download failed. Server status: ${response.status}`
+      );
+    }
+
+    const blob = await response.blob();
+
+    const file = new File([blob], fileName, {
+      type: blob.type ||
+        (isVideo ? "video/mp4" : "image/jpeg")
+    });
+
+    // iPhone/iPad: open the native Share Sheet.
+    if (
+      navigator.share &&
+      navigator.canShare &&
+      navigator.canShare({ files: [file] })
+    ) {
+      await navigator.share({
+        files: [file],
+        title: isVideo ? "Wedding Video" : "Wedding Photo"
+      });
+
+      galleryStatus.textContent =
+        "Use the Share menu to save your file.";
+      return;
+    }
+
+    // Fallback for browsers supporting file downloads.
+    const objectUrl = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+
+    downloadLink.href = objectUrl;
+    downloadLink.download = fileName;
+    downloadLink.style.display = "none";
+
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+    }, 60000);
+
+    galleryStatus.textContent =
+      "Download requested. Check your Downloads folder.";
+
+  } catch (error) {
+    if (error.name === "AbortError") {
+      galleryStatus.textContent = "Save cancelled.";
+      return;
+    }
+
+    console.error("File download error:", error);
+
+    galleryStatus.textContent =
+      "Unable to download this file. Try opening it directly.";
+
+    // Provide a direct link if fetching/sharing fails.
+    const fallbackLink = document.createElement("a");
+    fallbackLink.href = url;
+    fallbackLink.target = "_blank";
+    fallbackLink.rel = "noopener";
+    fallbackLink.textContent = isVideo
+      ? "Open video in browser"
+      : "Open photo in browser";
+
+    galleryStatus.appendChild(
+      document.createTextNode(" ")
+    );
+    galleryStatus.appendChild(fallbackLink);
+  }
+}
+
+// Load the gallery for a specific guest session.
 async function loadGallery(id) {
   boothPage.classList.add("hidden");
   galleryPage.classList.remove("hidden");
@@ -766,7 +849,7 @@ async function loadGallery(id) {
 
     if (files.length === 0) {
       galleryStatus.textContent =
-        "No files found yet. Please scan again after the uploads finish.";
+        "No files found yet. Please try again after uploads finish.";
       return;
     }
 
@@ -778,7 +861,11 @@ async function loadGallery(id) {
         .getPublicUrl(path);
 
       const url = publicData.publicUrl;
-      const isVideo = /\.(mp4|webm|mov)$/i.test(file.name);
+
+      // Recognise common photo and video file extensions.
+      const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(
+        file.name
+      );
 
       const item = document.createElement("div");
       item.className = "gallery-item";
@@ -792,35 +879,51 @@ async function loadGallery(id) {
         media.preload = "metadata";
       } else {
         media = document.createElement("img");
-        media.alt = "Your photo";
+        media.alt = "Wedding photo";
         media.loading = "lazy";
       }
 
       media.src = url;
 
-      const link = document.createElement("a");
-link.href = url;
-link.target = "_blank";
-link.rel = "noopener";
+      // Create a visible, working save button.
+      const saveButton = document.createElement("button");
+      saveButton.type = "button";
+      saveButton.className = "download-link";
+      saveButton.textContent = isVideo
+        ? "⬇ Save Wedding Video"
+        : "⬇ Save Wedding Photo";
 
-if (isVideo) {
-  // Open the video in Safari so iPhone users
-  // can use the Share menu to save it.
-  link.removeAttribute("download");
-  link.textContent = "▶ Open Video to Save";
-} else {
-  link.download = file.name;
-  link.textContent = "⬇ Download Photo";
-}
+      saveButton.addEventListener("click", async () => {
+        saveButton.disabled = true;
+
+        try {
+          await saveGalleryFile(url, file.name, isVideo);
+        } finally {
+          saveButton.disabled = false;
+        }
+      });
+
+      // Direct-open link as an additional fallback.
+      const openLink = document.createElement("a");
+      openLink.href = url;
+      openLink.target = "_blank";
+      openLink.rel = "noopener";
+      openLink.textContent = isVideo
+        ? "Open video"
+        : "Open photo";
+
+      item.append(media, saveButton, openLink);
+      galleryList.appendChild(item);
+    }
 
     galleryStatus.textContent =
       `${files.length} file(s) available. Enjoy your memories!`;
 
   } catch (error) {
-    console.error("Gallery error:", error);
+    console.error("Gallery loading error:", error);
 
     galleryStatus.textContent =
-      "Could not load the gallery. Check your connection or storage permissions.";
+      "Could not load the gallery. Check your connection or Supabase Storage permissions.";
   }
 }
 
