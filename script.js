@@ -933,27 +933,37 @@ async function loadGallery(id) {
 // startVideoButton.addEventListener("click", startRecording);
 // stopVideoButton.addEventListener("click", stopRecording);
 
-console.log("Snap & Smile JavaScript loaded");
-
-console.log("Start camera button:", startCameraButton);
-console.log("Camera element:", camera);
+console.log("Snap & Smile: JavaScript loaded");
 
 if (startCameraButton) {
-  startCameraButton.addEventListener("click", () => {
-    console.log("Start Camera button clicked!");
-  });
+  startCameraButton.addEventListener("click", async () => {
+    console.log("Start Camera clicked!");
 
-  startCameraButton.addEventListener("click", startCamera);
+    startCameraButton.disabled = true;
+
+    try {
+      await startCamera();
+    } catch (error) {
+      console.error("Start camera failed:", error);
+      setStatus("Camera error: " + error.message);
+    } finally {
+      startCameraButton.disabled = false;
+    }
+  });
 } else {
-  console.error("ERROR: Start Camera button not found!");
+  console.error('Cannot find button with id "startCamera"');
 }
 
-takePhotoButton.addEventListener("click", takePhoto);
-startVideoButton.addEventListener("click", startRecording);
-stopVideoButton.addEventListener("click", stopRecording);
+if (takePhotoButton) {
+  takePhotoButton.addEventListener("click", takePhoto);
+}
 
-if (validSession) {
-  loadGallery(requestedSession);
+if (startVideoButton) {
+  startVideoButton.addEventListener("click", startRecording);
+}
+
+if (stopVideoButton) {
+  stopVideoButton.addEventListener("click", stopRecording);
 }
 
 // STEP 14: Show the guest gallery when the URL has a valid session.
