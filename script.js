@@ -257,24 +257,31 @@ const footerTop =
   photoHeight * 3 +
   gap * 2;
 
-ctx.fillStyle = "#C16E65";
-ctx.font = "bold 24px Arial";
-ctx.fillText("SNAP & SMILE", center, footerTop + 20);
-
-ctx.fillStyle = "#51413D";
-ctx.font = "bold 12px Arial";
+// Couple's names
+ctx.fillStyle = "#8A7358";
+ctx.font = "italic 24px Georgia";
 ctx.fillText(
-  "THREE SHOTS. ONE MEMORY.",
+  "Syahlen & Tiqah",
   center,
-  footerTop + 46
+  footerTop + 22
 );
 
+// Romantic message
+ctx.fillStyle = "#51413D";
+ctx.font = "11px Georgia";
+ctx.fillText(
+  "A DAY TO REMEMBER",
+  center,
+  footerTop + 49
+);
+
+// Wedding date
 ctx.fillStyle = "#8A7770";
 ctx.font = "10px Arial";
 ctx.fillText(
-  "PHOTO BOOTH • 2026",
+  "08 AUGUST 2026",
   center,
-  footerTop + 68
+  footerTop + 70
 );
 
     const blob = await new Promise(resolve =>
