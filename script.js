@@ -392,41 +392,149 @@ function startRecording() {
   try {
     recordedChunks = [];
 
-    const recordingCanvas = document.createElement("canvas");
-    recordingCanvas.width = camera.videoWidth;
-    recordingCanvas.height = camera.videoHeight;
+    // Match the warm wedding photostrip design.
+    const photoWidth = 1080;
+    const photoHeight = 810;
+    const margin = 36;
+    const footer = 270;
 
-    const ctx = recordingCanvas.getContext("2d");
+    const videoCanvas = document.createElement("canvas");
+    videoCanvas.width = photoWidth + margin * 2;
+    videoCanvas.height = margin + photoHeight + footer;
 
-    recordingCanvasStream = recordingCanvas.captureStream(30);
+    const ctx = videoCanvas.getContext("2d", {
+      alpha: false
+    });
 
-    const tracks = [
-      ...recordingCanvasStream.getVideoTracks(),
-      ...cameraStream.getAudioTracks()
-    ];
+    if (!ctx) {
+      throw new Error("Could not create the video canvas.");
+    }
 
-    const recordingStream = new MediaStream(tracks);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
-    function drawMirroredFrame() {
-      if (!recorder || recorder.state !== "recording") {
-        return;
-      }
+    const center = videoCanvas.width / 2;
+    const footerTop = margin + photoHeight;
 
+    // Calculate a centre crop for a 4:3 camera frame.
+    const sourceWidth = camera.videoWidth;
+    const sourceHeight = camera.videoHeight;
+    const targetRatio = 4 / 3;
+    const sourceRatio = sourceWidth / sourceHeight;
+
+    let cropX = 0;
+    let cropY = 0;
+    let cropWidth = sourceWidth;
+    let cropHeight = sourceHeight;
+
+    if (sourceRatio > targetRatio) {
+      cropWidth = sourceHeight * targetRatio;
+      cropX = (sourceWidth - cropWidth) / 2;
+    } else if (sourceRatio < targetRatio) {
+      cropHeight = sourceWidth / targetRatio;
+      cropY = (sourceHeight - cropHeight) / 2;
+    }
+
+    // Draw the wedding design and live video frame.
+    function drawWeddingFrame() {
+      // Ivory background.
+      ctx.fillStyle = "#FFFDF9";
+      ctx.fillRect(
+        0,
+        0,
+        videoCanvas.width,
+        videoCanvas.height
+      );
+
+      // Subtle champagne border around the video.
+      ctx.fillStyle = "#D7C3A5";
+      ctx.fillRect(
+        margin - 3,
+        margin - 3,
+        photoWidth + 6,
+        photoHeight + 6
+      );
+
+      // Clip the camera image inside the photo frame.
       ctx.save();
-      ctx.setTransform(-1, 0, 0, 1, recordingCanvas.width, 0);
+      ctx.beginPath();
+      ctx.rect(
+        margin,
+        margin,
+        photoWidth,
+        photoHeight
+      );
+      ctx.clip();
+
+      // Mirror the live selfie, just like the photostrip.
+      ctx.translate(margin + photoWidth, margin);
+      ctx.scale(-1, 1);
 
       ctx.drawImage(
         camera,
+        cropX,
+        cropY,
+        cropWidth,
+        cropHeight,
         0,
         0,
-        recordingCanvas.width,
-        recordingCanvas.height
+        photoWidth,
+        photoHeight
       );
 
       ctx.restore();
 
+      // Wedding names.
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#8A7358";
+      ctx.font = "italic 72px Georgia";
+      ctx.fillText(
+        "Syahlen & Tiqah",
+        center,
+        footerTop + 66
+      );
+
+      // Wedding message.
+      ctx.fillStyle = "#51413D";
+      ctx.font = "33px Georgia";
+      ctx.fillText(
+        "A DAY TO REMEMBER",
+        center,
+        footerTop + 147
+      );
+
+      // Wedding date.
+      ctx.fillStyle = "#8A7770";
+      ctx.font = "30px Arial";
+      ctx.fillText(
+        "08 AUGUST 2026",
+        center,
+        footerTop + 213
+      );
+    }
+
+    // Render the first frame before recording starts.
+    drawWeddingFrame();
+
+    // Record the complete canvas, including the design.
+    recordingCanvasStream = videoCanvas.captureStream(30);
+
+    // Preserve microphone audio from the camera stream.
+    const recordingStream = new MediaStream([
+      ...recordingCanvasStream.getVideoTracks(),
+      ...cameraStream.getAudioTracks()
+    ]);
+
+    function animateVideo() {
+      if (!recorder || recorder.state !== "recording") {
+        return;
+      }
+
+      drawWeddingFrame();
+
       recordingAnimationId =
-        requestAnimationFrame(drawMirroredFrame);
+        requestAnimationFrame(animateVideo);
     }
 
     recorder = new MediaRecorder(recordingStream, {
@@ -450,12 +558,11 @@ function startRecording() {
         recordingAnimationId = null;
       }
 
-      // Stop canvas capture without stopping the camera.
+      // Stop canvas capture tracks only.
       if (recordingCanvasStream) {
         recordingCanvasStream.getTracks().forEach(track => {
           track.stop();
         });
-
         recordingCanvasStream = null;
       }
 
@@ -475,7 +582,7 @@ function startRecording() {
           throw new Error("No video data was recorded.");
         }
 
-        setStatus("Preparing your video...");
+        setStatus("Preparing your wedding video...");
 
         showPreview(videoBlob, "video");
 
@@ -484,7 +591,6 @@ function startRecording() {
           videoExtension,
           mimeType
         );
-
       } catch (error) {
         console.error("Video processing error:", error);
         setStatus("Video failed: " + error.message);
@@ -497,14 +603,16 @@ function startRecording() {
     };
 
     recorder.start(1000);
-    drawMirroredFrame();
+    animateVideo();
 
     startVideoButton.disabled = true;
     takePhotoButton.disabled = true;
     stopVideoButton.disabled = false;
     stopVideoButton.classList.remove("hidden");
 
-    setStatus("🔴 Recording video... Press Stop Recording when finished.");
+    setStatus(
+      "🔴 Recording wedding video... Press Stop Recording when finished."
+    );
 
   } catch (error) {
     console.error("Could not start recording:", error);
@@ -518,7 +626,6 @@ function startRecording() {
       recordingCanvasStream.getTracks().forEach(track => {
         track.stop();
       });
-
       recordingCanvasStream = null;
     }
 
@@ -531,7 +638,6 @@ function startRecording() {
     }
 
     recorder = null;
-
     startVideoButton.disabled = false;
     takePhotoButton.disabled = false;
     stopVideoButton.disabled = false;
@@ -558,7 +664,7 @@ function stopRecording(event) {
   }
 
   stopVideoButton.disabled = true;
-  setStatus("Stopping recording and preparing your video...");
+  setStatus("Preparing your wedding video...");
 
   try {
     recorder.stop();
