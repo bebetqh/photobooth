@@ -1,11 +1,10 @@
-
 /* =========================================
    SNAP & SMILE PHOTO BOOTH
    ========================================= */
 
-// STEP 1: Add your Supabase project details.
+// STEP 1: Supabase project details.
 const SUPABASE_URL = "https://pyfxtjrgsychawdlohmw.supabase.co";
-const SUPABASE_KEY = "sb_publishable_MOlIPBmHpblPoFpcSoAkXw_WbV-z-SQ";
+const SUPABASE_KEY = "sb_publishable_MOlIPBmHpblPoFpcSoAkXw_WbV-zS-Q";
 const BUCKET = "booth-media";
 
 const db = window.supabase.createClient(
@@ -238,38 +237,15 @@ async function takePhoto() {
     ctx.imageSmoothingQuality = "high";
 
     // Warm white wedding background.
-    ctx.fillStyle = "#FFFDF9";
+    ctx.fillStyle = "#fffaf5";
     ctx.fillRect(0, 0, collage.width, collage.height);
 
-    // Draw all three photos without stretching.
-    photos.forEach((photo, i) => {
-      const sourceWidth = photo.width;
-      const sourceHeight = photo.height;
-      const targetRatio = 4 / 3;
-      const sourceRatio = sourceWidth / sourceHeight;
-
-      let cropX = 0;
-      let cropY = 0;
-      let cropWidth = sourceWidth;
-      let cropHeight = sourceHeight;
-
-      // Centre-crop only when the camera aspect ratio differs.
-      if (sourceRatio > targetRatio) {
-        cropWidth = sourceHeight * targetRatio;
-        cropX = (sourceWidth - cropWidth) / 2;
-      } else if (sourceRatio < targetRatio) {
-        cropHeight = sourceWidth / targetRatio;
-        cropY = (sourceHeight - cropHeight) / 2;
-      }
-
-      const y = margin + i * (photoHeight + gap);
+    // Draw each photo into the photostrip.
+    photos.forEach((photo, index) => {
+      const y = margin + index * (photoHeight + gap);
 
       ctx.drawImage(
         photo,
-        cropX,
-        cropY,
-        cropWidth,
-        cropHeight,
         margin,
         y,
         photoWidth,
@@ -277,269 +253,138 @@ async function takePhoto() {
       );
     });
 
-    // Wedding footer.
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    const center = collage.width / 2;
-    const footerTop =
-      margin * 2 +
+    // Add the wedding footer.
+    const footerY =
+      margin +
       photoHeight * 3 +
       gap * 2;
 
-    // Couple's names.
-    ctx.fillStyle = "#8A7358";
-    ctx.font = "italic 72px Georgia";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#6e5145";
+
+    ctx.font = "italic 54px Georgia, serif";
     ctx.fillText(
       "Syahlen & Tiqah",
-      center,
-      footerTop + 66
+      collage.width / 2,
+      footerY + 75
     );
 
-    // Wedding message.
-    ctx.fillStyle = "#51413D";
-    ctx.font = "33px Georgia";
+    ctx.font = "bold 25px Arial, sans-serif";
     ctx.fillText(
       "A DAY TO REMEMBER",
-      center,
-      footerTop + 147
+      collage.width / 2,
+      footerY + 125
     );
 
-    // Wedding date.
-    ctx.fillStyle = "#8A7770";
-    ctx.font = "30px Arial";
+    ctx.font = "22px Arial, sans-serif";
     ctx.fillText(
       "08 AUGUST 2026",
-      center,
-      footerTop + 213
+      collage.width / 2,
+      footerY + 170
     );
 
-    // Export at high JPEG quality.
-    const blob = await new Promise(resolve => {
-      collage.toBlob(resolve, "image/jpeg", 0.95);
+    // Export the photostrip as a high-quality JPEG.
+    const photoBlob = await new Promise((resolve, reject) => {
+      collage.toBlob(
+        blob => {
+          if (blob) resolve(blob);
+          else reject(new Error("Could not export the photostrip."));
+        },
+        "image/jpeg",
+        0.95
+      );
     });
 
-    if (!blob) {
-      throw new Error("Could not create the high-quality photostrip.");
+    const photoFileName =
+      `photostrip-${Date.now()}.jpg`;
+
+    const photoPath =
+      `${sessionId}/${photoFileName}`;
+
+    setStatus("Uploading your photostrip...");
+
+    const { error: uploadError } = await db.storage
+      .from(BUCKET)
+      .upload(photoPath, photoBlob, {
+        contentType: "image/jpeg",
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw uploadError;
     }
 
-    showPreview(blob, "photo");
-    await uploadMedia(blob, "jpg", "image/jpeg");
+    uploadedFiles++;
+
+    const { data: photoUrlData } = db.storage
+      .from(BUCKET)
+      .getPublicUrl(photoPath);
+
+    const photoUrl = photoUrlData.publicUrl;
+
+    if (photoPreview) {
+      photoPreview.src = photoUrl;
+      photoPreview.classList.remove("hidden");
+    }
+
+    // Show a QR code linking to the session gallery.
+    if (qrContainer && window.QRCode) {
+      qrContainer.innerHTML = "";
+
+      const galleryUrl = new URL(window.location.href);
+      galleryUrl.searchParams.set("session", sessionId);
+      galleryUrl.searchParams.set("page", "gallery");
+
+      new QRCode(qrContainer, {
+        text: galleryUrl.toString(),
+        width: 180,
+        height: 180
+      });
+
+      qrPanel?.classList.remove("hidden");
+    }
+
+    setStatus("Your wedding photostrip is ready!");
 
   } catch (error) {
-    console.error("Photo error:", error);
-    setStatus("Photo failed: " + error.message);
+    console.error("Photo booth error:", error);
+    setStatus(`Sorry, something went wrong: ${error.message || error}`);
   } finally {
-    countdownRunning = false;
-    countdownDisplay?.classList.add("hidden");
     takePhotoButton.disabled = false;
     startVideoButton.disabled = false;
   }
 }
 
-// STEP 8: Show a local preview.
-function showPreview(blob, type) {
-  if (previewUrl) {
-    URL.revokeObjectURL(previewUrl);
-  }
-
-  previewUrl = URL.createObjectURL(blob);
-
-  document.getElementById("result")?.classList.remove("hidden");
-
-  if (type === "photo") {
-    photoPreview.src = previewUrl;
-    photoPreview.classList.remove("hidden");
-    videoPreview.classList.add("hidden");
-  } else {
-    videoPreview.src = previewUrl;
-    videoPreview.classList.remove("hidden");
-    photoPreview.classList.add("hidden");
-  }
-}
-
-// STEP 9: Record a mirrored video with microphone audio.
-function startRecording() {
-  if (!cameraStream || busy || recorder) {
-    return;
-  }
-
-  if (!camera.videoWidth || !camera.videoHeight) {
-    setStatus("Please wait for the camera to be ready.");
+// STEP 8: Record a video using the camera.
+function startVideo() {
+  if (!cameraStream || recorder?.state === "recording") {
     return;
   }
 
   if (!window.MediaRecorder) {
-    setStatus("Video recording is not supported by this browser.");
-    return;
-  }
-
-  const supportedTypes = [
-    "video/webm;codecs=vp8,opus",
-    "video/webm",
-    "video/mp4"
-  ];
-
-  const mimeType = supportedTypes.find(type =>
-    MediaRecorder.isTypeSupported(type)
-  );
-
-  if (!mimeType) {
-    setStatus("This browser does not support a compatible video format.");
+    setStatus("Video recording is not supported in this browser.");
     return;
   }
 
   try {
     recordedChunks = [];
 
-    // Match the warm wedding photostrip design.
-    const photoWidth = 1080;
-    const photoHeight = 810;
-    const margin = 36;
-    const footer = 270;
+    // Try MP4 first, then WebM, depending on browser support.
+    const supportedTypes = [
+      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm"
+    ];
 
-    const videoCanvas = document.createElement("canvas");
-    videoCanvas.width = photoWidth + margin * 2;
-    videoCanvas.height = margin + photoHeight + footer;
+    const mimeType = supportedTypes.find(type =>
+      MediaRecorder.isTypeSupported(type)
+    );
 
-    const ctx = videoCanvas.getContext("2d", {
-      alpha: false
-    });
-
-    if (!ctx) {
-      throw new Error("Could not create the video canvas.");
-    }
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-
-    const center = videoCanvas.width / 2;
-    const footerTop = margin + photoHeight;
-
-    // Calculate a centre crop for a 4:3 camera frame.
-    const sourceWidth = camera.videoWidth;
-    const sourceHeight = camera.videoHeight;
-    const targetRatio = 4 / 3;
-    const sourceRatio = sourceWidth / sourceHeight;
-
-    let cropX = 0;
-    let cropY = 0;
-    let cropWidth = sourceWidth;
-    let cropHeight = sourceHeight;
-
-    if (sourceRatio > targetRatio) {
-      cropWidth = sourceHeight * targetRatio;
-      cropX = (sourceWidth - cropWidth) / 2;
-    } else if (sourceRatio < targetRatio) {
-      cropHeight = sourceWidth / targetRatio;
-      cropY = (sourceHeight - cropHeight) / 2;
-    }
-
-    // Draw the wedding design and live video frame.
-    function drawWeddingFrame() {
-      // Ivory background.
-      ctx.fillStyle = "#FFFDF9";
-      ctx.fillRect(
-        0,
-        0,
-        videoCanvas.width,
-        videoCanvas.height
-      );
-
-      // Subtle champagne border around the video.
-      ctx.fillStyle = "#D7C3A5";
-      ctx.fillRect(
-        margin - 3,
-        margin - 3,
-        photoWidth + 6,
-        photoHeight + 6
-      );
-
-      // Clip the camera image inside the photo frame.
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(
-        margin,
-        margin,
-        photoWidth,
-        photoHeight
-      );
-      ctx.clip();
-
-      // Mirror the live selfie, just like the photostrip.
-      ctx.translate(margin + photoWidth, margin);
-      ctx.scale(-1, 1);
-
-      ctx.drawImage(
-        camera,
-        cropX,
-        cropY,
-        cropWidth,
-        cropHeight,
-        0,
-        0,
-        photoWidth,
-        photoHeight
-      );
-
-      ctx.restore();
-
-      // Wedding names.
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#8A7358";
-      ctx.font = "italic 72px Georgia";
-      ctx.fillText(
-        "Syahlen & Tiqah",
-        center,
-        footerTop + 66
-      );
-
-      // Wedding message.
-      ctx.fillStyle = "#51413D";
-      ctx.font = "33px Georgia";
-      ctx.fillText(
-        "A DAY TO REMEMBER",
-        center,
-        footerTop + 147
-      );
-
-      // Wedding date.
-      ctx.fillStyle = "#8A7770";
-      ctx.font = "30px Arial";
-      ctx.fillText(
-        "08 AUGUST 2026",
-        center,
-        footerTop + 213
-      );
-    }
-
-    // Render the first frame before recording starts.
-    drawWeddingFrame();
-
-    // Record the complete canvas, including the design.
-    recordingCanvasStream = videoCanvas.captureStream(30);
-
-    // Preserve microphone audio from the camera stream.
-    const recordingStream = new MediaStream([
-      ...recordingCanvasStream.getVideoTracks(),
-      ...cameraStream.getAudioTracks()
-    ]);
-
-    function animateVideo() {
-      if (!recorder || recorder.state !== "recording") {
-        return;
-      }
-
-      drawWeddingFrame();
-
-      recordingAnimationId =
-        requestAnimationFrame(animateVideo);
-    }
-
-    recorder = new MediaRecorder(recordingStream, {
-      mimeType
-    });
+    recorder = mimeType
+      ? new MediaRecorder(cameraStream, { mimeType })
+      : new MediaRecorder(cameraStream);
 
     recorder.ondataavailable = event => {
       if (event.data && event.data.size > 0) {
@@ -548,290 +393,219 @@ function startRecording() {
     };
 
     recorder.onerror = event => {
-      console.error("Recording error:", event.error || event);
-      setStatus("Recording error. Please try again.");
+      console.error("Video recording error:", event.error);
+      setStatus("There was a problem recording the video.");
     };
 
     recorder.onstop = async () => {
-      if (recordingAnimationId !== null) {
-        cancelAnimationFrame(recordingAnimationId);
-        recordingAnimationId = null;
-      }
-
-      // Stop canvas capture tracks only.
-      if (recordingCanvasStream) {
-        recordingCanvasStream.getTracks().forEach(track => {
-          track.stop();
-        });
-        recordingCanvasStream = null;
-      }
-
-      const videoBlob = new Blob(recordedChunks, {
-        type: mimeType
-      });
-
-      const videoExtension = mimeType.includes("mp4")
-        ? "mp4"
-        : "webm";
-
-      recordedChunks = [];
-      recorder = null;
-
       try {
+        const finalType =
+          recorder.mimeType ||
+          mimeType ||
+          "video/webm";
+
+        const videoBlob = new Blob(recordedChunks, {
+          type: finalType
+        });
+
         if (!videoBlob.size) {
-          throw new Error("No video data was recorded.");
+          throw new Error("The recorded video is empty.");
         }
 
-        setStatus("Preparing your wedding video...");
+        const extension = finalType.includes("mp4")
+          ? "mp4"
+          : "webm";
 
-        showPreview(videoBlob, "video");
+        const fileName =
+          `wedding-video-${Date.now()}.${extension}`;
 
-        await uploadMedia(
-          videoBlob,
-          videoExtension,
-          mimeType
-        );
+        const path = `${sessionId}/${fileName}`;
+
+        setStatus("Uploading your wedding video...");
+
+        const { error } = await db.storage
+          .from(BUCKET)
+          .upload(path, videoBlob, {
+            contentType: finalType,
+            upsert: false
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        uploadedFiles++;
+
+        const { data } = db.storage
+          .from(BUCKET)
+          .getPublicUrl(path);
+
+        if (videoPreview) {
+          videoPreview.src = data.publicUrl;
+          videoPreview.classList.remove("hidden");
+        }
+
+        setStatus("Your wedding video has been saved!");
       } catch (error) {
-        console.error("Video processing error:", error);
-        setStatus("Video failed: " + error.message);
+        console.error("Video upload error:", error);
+        setStatus(
+          `Could not save video: ${error.message || error}`
+        );
       } finally {
         startVideoButton.disabled = false;
-        takePhotoButton.disabled = false;
-        stopVideoButton.disabled = false;
-        stopVideoButton.classList.add("hidden");
+        stopVideoButton.disabled = true;
       }
     };
 
     recorder.start(1000);
-    animateVideo();
 
     startVideoButton.disabled = true;
-    takePhotoButton.disabled = true;
     stopVideoButton.disabled = false;
-    stopVideoButton.classList.remove("hidden");
 
-    setStatus(
-      "🔴 Recording wedding video... Press Stop Recording when finished."
-    );
+    setStatus("Recording your wedding video...");
 
   } catch (error) {
-    console.error("Could not start recording:", error);
-
-    if (recordingAnimationId !== null) {
-      cancelAnimationFrame(recordingAnimationId);
-      recordingAnimationId = null;
-    }
-
-    if (recordingCanvasStream) {
-      recordingCanvasStream.getTracks().forEach(track => {
-        track.stop();
-      });
-      recordingCanvasStream = null;
-    }
-
-    if (recorder && recorder.state !== "inactive") {
-      try {
-        recorder.stop();
-      } catch (stopError) {
-        console.error(stopError);
-      }
-    }
-
-    recorder = null;
-    startVideoButton.disabled = false;
-    takePhotoButton.disabled = false;
-    stopVideoButton.disabled = false;
-    stopVideoButton.classList.add("hidden");
-
-    setStatus("Could not start recording. Check the browser console.");
+    console.error("Could not start video recording:", error);
+    setStatus(
+      `Could not start recording: ${error.message || error}`
+    );
   }
 }
 
-// Stop video recording.
-function stopRecording(event) {
-  if (event) {
-    event.preventDefault();
-  }
-
-  if (!recorder) {
-    setStatus("No active recording was found.");
-    return;
-  }
-
-  if (recorder.state === "inactive") {
-    setStatus("The recording has already stopped.");
-    return;
-  }
-
-  stopVideoButton.disabled = true;
-  setStatus("Preparing your wedding video...");
-
-  try {
+// STEP 9: Stop recording.
+function stopVideo() {
+  if (recorder && recorder.state === "recording") {
     recorder.stop();
-  } catch (error) {
-    console.error("Could not stop recording:", error);
-    stopVideoButton.disabled = false;
-    setStatus("Could not stop recording. Please try again.");
+    setStatus("Finishing your video...");
   }
 }
 
-// STEP 10: Upload media to Supabase.
-async function uploadMedia(blob, extension, contentType) {
-  if (busy) return;
-
-  busy = true;
+// STEP 10: Download or share a gallery file.
+// FIX: Try Supabase Storage download first, then the public URL.
+async function saveGalleryFile(path, url, fileName, isVideo) {
+  let blob = null;
 
   try {
-    const fileName =
-      `${sessionId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    galleryStatus.textContent = "Preparing your download...";
 
-    setStatus("Uploading your file... Please wait.");
-
-    const { error } = await db.storage
+    // First try downloading directly from Supabase Storage.
+    const { data, error } = await db.storage
       .from(BUCKET)
-      .upload(fileName, blob, {
-        contentType,
-        upsert: false
-      });
+      .download(path);
 
-    if (error) throw error;
-
-    uploadedFiles++;
-
-    setStatus("Upload complete! Your file is ready.");
-
-    createQRCode();
-
-  } catch (error) {
-    console.error("Upload error:", error);
-
-    setStatus(
-      "Upload failed. Check your Supabase settings and internet connection."
-    );
-  } finally {
-    busy = false;
-    stopVideoButton.disabled = false;
-  }
-}
-
-// STEP 11: Create a QR code linking to this session's gallery.
-function createQRCode() {
-  const galleryUrl = new URL(window.location.href);
-
-  galleryUrl.search = "";
-  galleryUrl.hash = "";
-  galleryUrl.searchParams.set("session", sessionId);
-
-  qrContainer.replaceChildren();
-
-  new QRCode(qrContainer, {
-    text: galleryUrl.href,
-    width: 220,
-    height: 220,
-    correctLevel: QRCode.CorrectLevel.M
-  });
-
-  qrPanel.classList.remove("hidden");
-
-  qrPanel.scrollIntoView({
-    behavior: "smooth",
-    block: "nearest"
-  });
-}
-
-// STEP 12: Load the gallery on a guest's phone.
-// Save a photo or video on the guest's device.
-async function saveGalleryFile(url, fileName, isVideo) {
-  try {
-    galleryStatus.textContent = "Preparing your file...";
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(
-        `Download failed. Server status: ${response.status}`
+    if (!error && data) {
+      blob = data;
+    } else {
+      console.warn(
+        "Supabase Storage download failed; trying public URL:",
+        error
       );
     }
 
-    const blob = await response.blob();
+    // Fallback: fetch the public URL.
+    if (!blob) {
+      const response = await fetch(url);
 
-    const file = new File([blob], fileName, {
-      type: blob.type ||
-        (isVideo ? "video/mp4" : "image/jpeg")
+      if (!response.ok) {
+        throw new Error(
+          `Download failed with HTTP ${response.status}`
+        );
+      }
+
+      blob = await response.blob();
+    }
+
+    if (!blob || blob.size === 0) {
+      throw new Error("The downloaded file is empty.");
+    }
+
+    // Use the real file MIME type where possible.
+    const mimeType = blob.type ||
+      (isVideo ? "video/mp4" : "image/jpeg");
+
+    const downloadBlob = new Blob([blob], {
+      type: mimeType
     });
 
-    // iPhone/iPad: open the native Share Sheet.
-    if (
-      navigator.share &&
-      navigator.canShare &&
-      navigator.canShare({ files: [file] })
-    ) {
-      await navigator.share({
-        files: [file],
-        title: isVideo ? "Wedding Video" : "Wedding Photo"
-      });
+    // Try the device share sheet on supported phones.
+    const file = new File(
+      [downloadBlob],
+      fileName,
+      { type: mimeType }
+    );
 
-      galleryStatus.textContent =
-        "Use the Share menu to save your file.";
-      return;
+    if (
+      navigator.canShare &&
+      navigator.canShare({ files: [file] }) &&
+      navigator.share
+    ) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: isVideo
+            ? "Save Wedding Video"
+            : "Save Wedding Photo"
+        });
+
+        galleryStatus.textContent = "File shared successfully.";
+        return;
+      } catch (shareError) {
+        // If the user cancels sharing, do not force a second download.
+        if (shareError.name === "AbortError") {
+          galleryStatus.textContent = "Sharing cancelled.";
+          return;
+        }
+
+        console.warn(
+          "Sharing unavailable; using browser download:",
+          shareError
+        );
+      }
     }
 
-    // Fallback for browsers supporting file downloads.
-    const objectUrl = URL.createObjectURL(blob);
-    const downloadLink = document.createElement("a");
+    // Standard browser download fallback.
+    const objectUrl = URL.createObjectURL(downloadBlob);
+    const link = document.createElement("a");
 
-    downloadLink.href = objectUrl;
-    downloadLink.download = fileName;
-    downloadLink.style.display = "none";
+    link.href = objectUrl;
+    link.download = fileName;
+    link.style.display = "none";
 
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    downloadLink.remove();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
-    setTimeout(() => {
-      URL.revokeObjectURL(objectUrl);
-    }, 60000);
+    // Give the browser time to begin the download before cleanup.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
 
-    galleryStatus.textContent =
-      "Download requested. Check your Downloads folder.";
+    galleryStatus.textContent = "Your download should begin shortly.";
 
   } catch (error) {
-    if (error.name === "AbortError") {
-      galleryStatus.textContent = "Save cancelled.";
-      return;
+    console.error("Gallery download error:", error);
+
+    // Last resort: open the public URL in a new tab.
+    if (url) {
+      const openLink = document.createElement("a");
+      openLink.href = url;
+      openLink.target = "_blank";
+      openLink.rel = "noopener noreferrer";
+      openLink.click();
     }
 
-    console.error("File download error:", error);
-
     galleryStatus.textContent =
-      "Unable to download this file. Try opening it directly.";
-
-    // Provide a direct link if fetching/sharing fails.
-    const fallbackLink = document.createElement("a");
-    fallbackLink.href = url;
-    fallbackLink.target = "_blank";
-    fallbackLink.rel = "noopener";
-    fallbackLink.textContent = isVideo
-      ? "Open video in browser"
-      : "Open photo in browser";
-
-    galleryStatus.appendChild(
-      document.createTextNode(" ")
-    );
-    galleryStatus.appendChild(fallbackLink);
+      `Download failed: ${error.message || error}. Check storage permissions.`;
   }
 }
 
-// Load the gallery for a specific guest session.
+// STEP 11: Load files from the session gallery.
 async function loadGallery(id) {
-  boothPage.classList.add("hidden");
-  galleryPage.classList.remove("hidden");
+  if (!galleryList || !galleryStatus) return;
 
-  galleryStatus.textContent = "Loading your files...";
-  galleryList.replaceChildren();
+  galleryList.innerHTML = "";
+  galleryStatus.textContent = "Loading your gallery...";
 
   try {
-    const { data, error } = await db.storage
+    const { data: files, error } = await db.storage
       .from(BUCKET)
       .list(id, {
         limit: 100,
@@ -843,17 +617,20 @@ async function loadGallery(id) {
 
     if (error) throw error;
 
-    const files = (data || []).filter(file =>
-      file.name && !file.name.startsWith(".")
-    );
-
-    if (files.length === 0) {
+    if (!files || files.length === 0) {
       galleryStatus.textContent =
-        "No files found yet. Please try again after uploads finish.";
+        "No photos or videos found for this session yet.";
       return;
     }
 
-    for (const file of files) {
+    galleryStatus.textContent = "";
+
+    files.forEach(file => {
+      if (!file.name || file.name === ".emptyFolderPlaceholder") {
+        return;
+      }
+
+      // The stored file path includes the session folder.
       const path = `${id}/${file.name}`;
 
       const { data: publicData } = db.storage
@@ -862,111 +639,106 @@ async function loadGallery(id) {
 
       const url = publicData.publicUrl;
 
-      // Recognise common photo and video file extensions.
-      const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(
-        file.name
-      );
+      const isVideo =
+        /\.(mp4|webm|mov|m4v|ogg)$/i.test(file.name);
 
-      const item = document.createElement("div");
-      item.className = "gallery-item";
+      const isImage =
+        /\.(jpg|jpeg|png|gif|webp|avif)$/i.test(file.name);
 
-      let media;
+      if (!isVideo && !isImage) return;
+
+      const card = document.createElement("div");
+      card.className = "gallery-item";
 
       if (isVideo) {
-        media = document.createElement("video");
-        media.controls = true;
-        media.playsInline = true;
-        media.preload = "metadata";
+        const video = document.createElement("video");
+        video.src = url;
+        video.controls = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        video.className = "gallery-media";
+        card.appendChild(video);
       } else {
-        media = document.createElement("img");
-        media.alt = "Wedding photo";
-        media.loading = "lazy";
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = "Wedding photo";
+        image.loading = "lazy";
+        image.className = "gallery-media";
+        card.appendChild(image);
       }
 
-      media.src = url;
+      const downloadButton = document.createElement("button");
+      downloadButton.type = "button";
+      downloadButton.className = "download-button";
+      downloadButton.textContent = isVideo
+        ? "Save Wedding Video"
+        : "Save Photo";
 
-      // Create a visible, working save button.
-      const saveButton = document.createElement("button");
-      saveButton.type = "button";
-      saveButton.className = "download-link";
-      saveButton.textContent = isVideo
-        ? "⬇ Save Wedding Video"
-        : "⬇ Save Wedding Photo";
-
-      saveButton.addEventListener("click", async () => {
-        saveButton.disabled = true;
+      downloadButton.addEventListener("click", async () => {
+        downloadButton.disabled = true;
+        downloadButton.textContent = "Preparing...";
 
         try {
-          await saveGalleryFile(url, file.name, isVideo);
+          // IMPORTANT FIX: pass path as well as the public URL.
+          await saveGalleryFile(path, url, file.name, isVideo);
         } finally {
-          saveButton.disabled = false;
+          downloadButton.disabled = false;
+          downloadButton.textContent = isVideo
+            ? "Save Wedding Video"
+            : "Save Photo";
         }
       });
 
-      // Direct-open link as an additional fallback.
-      const openLink = document.createElement("a");
-      openLink.href = url;
-      openLink.target = "_blank";
-      openLink.rel = "noopener";
-      openLink.textContent = isVideo
-        ? "Open video"
-        : "Open photo";
+      card.appendChild(downloadButton);
+      galleryList.appendChild(card);
+    });
 
-      item.append(media, saveButton, openLink);
-      galleryList.appendChild(item);
+    if (!galleryList.children.length) {
+      galleryStatus.textContent =
+        "No supported photos or videos were found.";
     }
-
-    galleryStatus.textContent =
-      `${files.length} file(s) available. Enjoy your memories!`;
 
   } catch (error) {
     console.error("Gallery loading error:", error);
 
     galleryStatus.textContent =
-      "Could not load the gallery. Check your connection or Supabase Storage permissions.";
+      `Could not load gallery: ${error.message || error}`;
   }
 }
 
-// STEP 13: Connect buttons.
-// startCameraButton.addEventListener("click", startCamera);
-// takePhotoButton.addEventListener("click", takePhoto);
-// startVideoButton.addEventListener("click", startRecording);
-// stopVideoButton.addEventListener("click", stopRecording);
+// STEP 12: Set up page navigation and buttons.
+function showGallery() {
+  boothPage?.classList.add("hidden");
+  galleryPage?.classList.remove("hidden");
+  loadGallery(sessionId);
+}
 
-console.log("Snap & Smile: JavaScript loaded");
+function showBooth() {
+  galleryPage?.classList.add("hidden");
+  boothPage?.classList.remove("hidden");
+}
 
-if (startCameraButton) {
-  startCameraButton.addEventListener("click", async () => {
-    console.log("Start Camera clicked!");
+// STEP 13: Attach event listeners.
+startCameraButton?.addEventListener("click", startCamera);
+takePhotoButton?.addEventListener("click", takePhoto);
+startVideoButton?.addEventListener("click", startVideo);
+stopVideoButton?.addEventListener("click", stopVideo);
 
-    startCameraButton.disabled = true;
+document.getElementById("openGallery")?.addEventListener(
+  "click",
+  showGallery
+);
 
-    try {
-      await startCamera();
-    } catch (error) {
-      console.error("Start camera failed:", error);
-      setStatus("Camera error: " + error.message);
-    } finally {
-      startCameraButton.disabled = false;
-    }
-  });
+document.getElementById("backToBooth")?.addEventListener(
+  "click",
+  showBooth
+);
+
+// STEP 14: Open the requested page.
+const requestedPage = urlParams.get("page");
+
+if (requestedPage === "gallery") {
+  showGallery();
 } else {
-  console.error('Cannot find button with id "startCamera"');
-}
-
-if (takePhotoButton) {
-  takePhotoButton.addEventListener("click", takePhoto);
-}
-
-if (startVideoButton) {
-  startVideoButton.addEventListener("click", startRecording);
-}
-
-if (stopVideoButton) {
-  stopVideoButton.addEventListener("click", stopRecording);
-}
-
-// STEP 14: Show the guest gallery when the URL has a valid session.
-if (validSession) {
-  loadGallery(requestedSession);
+  showBooth();
 }
