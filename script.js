@@ -282,61 +282,73 @@ function showPreview(blob, type) {
 function startRecording() {
   if (!cameraStream || busy || recorder) return;
 
-  const formats = [
-    "video/webm;codecs=vp8,opus",
-    "video/webm"
-  ];
-
-  const mimeType = formats.find(type =>
-    MediaRecorder.isTypeSupported(type)
-  );
-
-  if (!mimeType) {
-    setStatus("This browser does not support video recording.");
+  if (!camera.videoWidth || !camera.videoHeight) {
+    setStatus("Please wait for the camera to be ready.");
     return;
   }
+
+  const mimeType = [
+    "video/webm;codecs=vp8,opus",
+    "video/webm"
+  ].find(type => MediaRecorder.isTypeSupported(type));
+
+  if (!mimeType) {
+    setStatus("Video recording is not supported in this browser.");
+    return;
+  }
+
+  let canvasStream;
+  let animationId;
+  let recordingCanvas;
 
   try {
     recordedChunks = [];
 
-    // Create a canvas for mirrored video
-    const canvas = document.createElement("canvas");
-    canvas.width = camera.videoWidth;
-    canvas.height = camera.videoHeight;
+    // Create canvas with the same dimensions as the camera
+    recordingCanvas = document.createElement("canvas");
+    recordingCanvas.width = camera.videoWidth;
+    recordingCanvas.height = camera.videoHeight;
 
-    const ctx = canvas.getContext("2d");
-    let animationId;
+    const ctx = recordingCanvas.getContext("2d");
 
-    // Mirror every video frame
-    function drawFrame() {
+    // Draw every frame as a mirror image
+    function drawMirroredFrame() {
+      if (!recorder || recorder.state === "inactive") return;
+
+      ctx.clearRect(
+        0,
+        0,
+        recordingCanvas.width,
+        recordingCanvas.height
+      );
+
       ctx.save();
-      ctx.translate(canvas.width, 0);
+      ctx.translate(recordingCanvas.width, 0);
       ctx.scale(-1, 1);
 
       ctx.drawImage(
         camera,
         0,
         0,
-        canvas.width,
-        canvas.height
+        recordingCanvas.width,
+        recordingCanvas.height
       );
 
       ctx.restore();
-      animationId = requestAnimationFrame(drawFrame);
+
+      animationId = requestAnimationFrame(drawMirroredFrame);
     }
 
-    drawFrame();
+    // Capture canvas video
+    canvasStream = recordingCanvas.captureStream(30);
 
-    // Capture mirrored video at 30 FPS
-    const canvasStream = canvas.captureStream(30);
-
-    // Keep microphone audio
+    // Add microphone audio
     cameraStream.getAudioTracks().forEach(track => {
       canvasStream.addTrack(track);
     });
 
     recorder = new MediaRecorder(canvasStream, {
-      mimeType
+      mimeType: mimeType
     });
 
     recorder.ondataavailable = event => {
@@ -346,17 +358,14 @@ function startRecording() {
     };
 
     recorder.onerror = event => {
-      console.error(event);
-      cancelAnimationFrame(animationId);
+      console.error("Recording error:", event);
       setStatus("Recording error. Please try again.");
     };
 
     recorder.onstop = async () => {
       cancelAnimationFrame(animationId);
 
-      canvasStream.getTracks().forEach(track => {
-        track.stop();
-      });
+      canvasStream.getTracks().forEach(track => track.stop());
 
       const videoBlob = new Blob(recordedChunks, {
         type: mimeType
@@ -370,26 +379,27 @@ function startRecording() {
           throw new Error("No video was recorded.");
         }
 
-        // Show the recorded video preview
         showPreview(videoBlob, "video");
 
-        // Upload the mirrored video
         await uploadMedia(
           videoBlob,
           "webm",
           mimeType
         );
-
       } catch (error) {
         console.error(error);
         setStatus("Video failed: " + error.message);
-
       } finally {
         startVideoButton.disabled = false;
         takePhotoButton.disabled = false;
+        stopVideoButton.disabled = false;
         stopVideoButton.classList.add("hidden");
       }
     };
+
+    // Start drawing BEFORE recording
+    // Set recorder first so drawMirroredFrame can run
+    drawMirroredFrame();
 
     recorder.start();
 
@@ -398,16 +408,20 @@ function startRecording() {
     stopVideoButton.disabled = false;
     stopVideoButton.classList.remove("hidden");
 
-    setStatus(
-      "🔴 Recording mirrored video... Tap Stop Recording when finished."
-    );
+    setStatus("🔴 Recording mirrored video...");
 
   } catch (error) {
     console.error(error);
+
+    if (canvasStream) {
+      canvasStream.getTracks().forEach(track => track.stop());
+    }
+
     recorder = null;
     setStatus("Could not start video recording.");
   }
 }
+
 // STEP 10: Upload media to Supabase.
 async function uploadMedia(blob, extension, contentType) {
   if (busy) return;
