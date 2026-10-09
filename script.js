@@ -190,8 +190,8 @@ async function takePhoto() {
 /* RESIZABLE PHOTO STRIP — EACH PHOTO REMAINS 4:3 */
 
 // Change these two values to resize the whole strip
-const stripWidth = 200;
-const stripHeight = 150;
+const stripWidth = 600;
+const stripHeight = 1500;
 
 const collage = document.createElement("canvas");
 collage.width = stripWidth;
