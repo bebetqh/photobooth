@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,16 +15,19 @@
   <!-- QR Code generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
+  <!-- Main JavaScript -->
   <script src="script.js" defer></script>
 </head>
 
 <body>
   <header class="header">
     <p class="eyebrow">A celebration of love</p>
+
     <h1>
-    The Wedding<br>
-    <span>Photo Booth</span>
-  </h1>
+      The Wedding<br>
+      <span>Photo Booth</span>
+    </h1>
+
     <p class="subtitle">Take a picture. Make a memory.</p>
   </header>
 
@@ -37,23 +39,27 @@
 
       <div class="camera-frame">
         <video id="camera" autoplay playsinline muted></video>
+
         <div id="countdown" class="countdown hidden"></div>
+
         <div id="cameraPlaceholder" class="camera-placeholder">
           <div class="camera-icon">📸</div>
+
           <p>Your next favourite memory starts here.</p>
+
           <button
-  id="startCamera"
-  type="button"
-  class="button primary"
-  onclick="document.getElementById('status').textContent = 'BUTTON WORKS';"
->
-  Start Camera
-</button>
+            id="startCamera"
+            type="button"
+            class="button primary"
+          >
+            Start Camera
+          </button>
         </div>
       </div>
 
       <div class="controls">
         <label for="timerSelect">Photo countdown</label>
+
         <select id="timerSelect">
           <option value="0">No countdown</option>
           <option value="3" selected>3 seconds</option>
@@ -61,7 +67,7 @@
           <option value="10">10 seconds</option>
         </select>
 
-        <button id="takePhoto" class="button primary" disabled>
+        <button id="takePhoto" class="button primary" type="button" disabled>
           📸 Take Photo
         </button>
 
@@ -78,26 +84,52 @@
         Tap Start Camera to begin.
       </p>
 
+      <!-- PHOTO AND VIDEO PREVIEW -->
       <div id="result" class="result hidden">
         <h2>Your memory is ready!</h2>
-        <img id="photoPreview" class="preview hidden" alt="Photo preview">
-        <video id="videoPreview" class="preview hidden" controls playsinline></video>
+
+        <img
+          id="photoPreview"
+          class="preview hidden"
+          alt="Photo preview"
+        >
+
+        <video
+          id="videoPreview"
+          class="preview hidden"
+          controls
+          playsinline
+        ></video>
       </div>
 
+      <!-- QR CODE -->
       <div id="qrPanel" class="qr-panel hidden">
         <h2>Get your photos & videos</h2>
+
         <p>Scan this QR code with your phone to open your gallery.</p>
+
         <div id="qrcode"></div>
-        <p class="small-text">Keep this page open until your uploads finish.</p>
+
+        <p class="small-text">
+          Keep this page open until your uploads finish.
+        </p>
       </div>
     </section>
 
     <!-- GUEST GALLERY -->
     <section id="galleryPage" class="panel hidden">
       <div class="event-label">YOUR PERSONAL GALLERY</div>
+
       <h2>Your memories, all in one place.</h2>
-      <p class="subtitle">Tap a download link to save your files.</p>
-      <p id="galleryStatus" role="status">Loading your gallery...</p>
+
+      <p class="subtitle">
+        Tap a download link to save your files.
+      </p>
+
+      <p id="galleryStatus" role="status">
+        Loading your gallery...
+      </p>
+
       <div id="galleryList" class="gallery-list"></div>
     </section>
 
@@ -106,40 +138,5 @@
   <footer>
     <p>Made with ♡ for your special moments</p>
   </footer>
-
-  <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const button = document.getElementById("startCamera");
-  const status = document.getElementById("status");
-
-  if (!button) {
-    alert("ERROR: Start Camera button not found!");
-    return;
-  }
-
-  button.addEventListener("click", async function () {
-    alert("Button works! Now testing camera...");
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
-
-      const video = document.getElementById("camera");
-      video.srcObject = stream;
-      await video.play();
-
-      document.getElementById("cameraPlaceholder").style.display = "none";
-      status.textContent = "Camera is working! ❤️";
-
-    } catch (error) {
-      alert("Camera error: " + error.name + " — " + error.message);
-      status.textContent = "Camera error: " + error.name;
-    }
-  });
-});
-</script>
-  
 </body>
 </html>
