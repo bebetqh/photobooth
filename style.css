@@ -298,3 +298,9 @@ footer {
     width: 100%;
   }
 }
+
+
+/* Mirror the live selfie camera */
+#camera {
+  transform: scaleX(-1);
+}

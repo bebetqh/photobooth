@@ -158,9 +158,21 @@ async function takePhoto() {
       canvas.width = camera.videoWidth;
       canvas.height = camera.videoHeight;
 
-      canvas.getContext("2d").drawImage(
-        camera, 0, 0, canvas.width, canvas.height
+      const photoContext = canvas.getContext("2d");
+
+      photoContext.save();
+      photoContext.translate(canvas.width, 0);
+      photoContext.scale(-1, 1);
+
+      photoContext.drawImage(
+        camera,
+        0,
+        0,
+        canvas.width,
+        canvas.height
       );
+
+      photoContext.restore();
 
       photos.push(canvas);
 
