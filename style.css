@@ -84,6 +84,8 @@ h1 span {
   height: 100%;
   object-fit: cover;
   display: block;
+  transform: scaleX(-1);
+  -webkit-transform: scaleX(-1);
 }
 
 .camera-placeholder {
@@ -301,6 +303,3 @@ footer {
 
 
 /* Mirror the live selfie camera */
-#camera {
-  transform: scaleX(-1);
-}
