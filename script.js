@@ -283,7 +283,6 @@ function startRecording() {
   if (!cameraStream || busy || recorder) return;
 
   const formats = [
-    "video/mp4",
     "video/webm;codecs=vp8,opus",
     "video/webm"
   ];
@@ -299,7 +298,46 @@ function startRecording() {
 
   try {
     recordedChunks = [];
-    recorder = new MediaRecorder(cameraStream, { mimeType });
+
+    // Create a canvas for mirrored video
+    const canvas = document.createElement("canvas");
+    canvas.width = camera.videoWidth;
+    canvas.height = camera.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    let animationId;
+
+    // Mirror every video frame
+    function drawFrame() {
+      ctx.save();
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+
+      ctx.drawImage(
+        camera,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      ctx.restore();
+      animationId = requestAnimationFrame(drawFrame);
+    }
+
+    drawFrame();
+
+    // Capture mirrored video at 30 FPS
+    const canvasStream = canvas.captureStream(30);
+
+    // Keep microphone audio
+    cameraStream.getAudioTracks().forEach(track => {
+      canvasStream.addTrack(track);
+    });
+
+    recorder = new MediaRecorder(canvasStream, {
+      mimeType
+    });
 
     recorder.ondataavailable = event => {
       if (event.data.size > 0) {
@@ -309,15 +347,20 @@ function startRecording() {
 
     recorder.onerror = event => {
       console.error(event);
+      cancelAnimationFrame(animationId);
       setStatus("Recording error. Please try again.");
     };
 
     recorder.onstop = async () => {
+      cancelAnimationFrame(animationId);
+
+      canvasStream.getTracks().forEach(track => {
+        track.stop();
+      });
+
       const videoBlob = new Blob(recordedChunks, {
         type: mimeType
       });
-
-      const extension = mimeType.includes("mp4") ? "mp4" : "webm";
 
       recorder = null;
       recordedChunks = [];
@@ -327,15 +370,20 @@ function startRecording() {
           throw new Error("No video was recorded.");
         }
 
+        // Show the recorded video preview
         showPreview(videoBlob, "video");
+
+        // Upload the mirrored video
         await uploadMedia(
           videoBlob,
-          extension,
+          "webm",
           mimeType
         );
+
       } catch (error) {
         console.error(error);
         setStatus("Video failed: " + error.message);
+
       } finally {
         startVideoButton.disabled = false;
         takePhotoButton.disabled = false;
@@ -347,24 +395,19 @@ function startRecording() {
 
     startVideoButton.disabled = true;
     takePhotoButton.disabled = true;
+    stopVideoButton.disabled = false;
     stopVideoButton.classList.remove("hidden");
 
-    setStatus("🔴 Recording... Tap Stop Recording when finished.");
+    setStatus(
+      "🔴 Recording mirrored video... Tap Stop Recording when finished."
+    );
+
   } catch (error) {
     console.error(error);
     recorder = null;
     setStatus("Could not start video recording.");
   }
 }
-
-function stopRecording() {
-  if (recorder && recorder.state !== "inactive") {
-    stopVideoButton.disabled = true;
-    recorder.stop();
-    setStatus("Preparing your video...");
-  }
-}
-
 // STEP 10: Upload media to Supabase.
 async function uploadMedia(blob, extension, contentType) {
   if (busy) return;
