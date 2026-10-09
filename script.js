@@ -293,38 +293,27 @@ function startRecording() {
   ].find(type => MediaRecorder.isTypeSupported(type));
 
   if (!mimeType) {
-    setStatus("Video recording is not supported in this browser.");
+    setStatus("Video recording is not supported.");
     return;
   }
 
   let canvasStream;
   let animationId;
-  let recordingCanvas;
 
   try {
     recordedChunks = [];
 
-    // Create canvas with the same dimensions as the camera
-    recordingCanvas = document.createElement("canvas");
+    // Create canvas for the mirrored recording
+    const recordingCanvas = document.createElement("canvas");
     recordingCanvas.width = camera.videoWidth;
     recordingCanvas.height = camera.videoHeight;
 
     const ctx = recordingCanvas.getContext("2d");
 
-    // Draw every frame as a mirror image
+    // Draw mirrored frames continuously
     function drawMirroredFrame() {
-      if (!recorder || recorder.state === "inactive") return;
-
-      ctx.clearRect(
-        0,
-        0,
-        recordingCanvas.width,
-        recordingCanvas.height
-      );
-
       ctx.save();
-      ctx.translate(recordingCanvas.width, 0);
-      ctx.scale(-1, 1);
+      ctx.setTransform(-1, 0, 0, 1, recordingCanvas.width, 0);
 
       ctx.drawImage(
         camera,
@@ -339,16 +328,15 @@ function startRecording() {
       animationId = requestAnimationFrame(drawMirroredFrame);
     }
 
-    // Capture canvas video
     canvasStream = recordingCanvas.captureStream(30);
 
-    // Add microphone audio
+    // Preserve microphone audio
     cameraStream.getAudioTracks().forEach(track => {
       canvasStream.addTrack(track);
     });
 
     recorder = new MediaRecorder(canvasStream, {
-      mimeType: mimeType
+      mimeType
     });
 
     recorder.ondataavailable = event => {
@@ -359,6 +347,7 @@ function startRecording() {
 
     recorder.onerror = event => {
       console.error("Recording error:", event);
+      cancelAnimationFrame(animationId);
       setStatus("Recording error. Please try again.");
     };
 
@@ -379,16 +368,14 @@ function startRecording() {
           throw new Error("No video was recorded.");
         }
 
+        // Preview and upload the same mirrored video
         showPreview(videoBlob, "video");
+        await uploadMedia(videoBlob, "webm", mimeType);
 
-        await uploadMedia(
-          videoBlob,
-          "webm",
-          mimeType
-        );
       } catch (error) {
         console.error(error);
         setStatus("Video failed: " + error.message);
+
       } finally {
         startVideoButton.disabled = false;
         takePhotoButton.disabled = false;
@@ -397,11 +384,9 @@ function startRecording() {
       }
     };
 
-    // Start drawing BEFORE recording
-    // Set recorder first so drawMirroredFrame can run
-    drawMirroredFrame();
-
+    // IMPORTANT: Start the recorder before drawing frames
     recorder.start();
+    drawMirroredFrame();
 
     startVideoButton.disabled = true;
     takePhotoButton.disabled = true;
