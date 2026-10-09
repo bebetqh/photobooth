@@ -799,17 +799,19 @@ async function loadGallery(id) {
       media.src = url;
 
       const link = document.createElement("a");
-      link.href = url;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.download = file.name;
-      link.textContent = isVideo
-        ? "⬇ Download video"
-        : "⬇ Download photo";
+link.href = url;
+link.target = "_blank";
+link.rel = "noopener";
 
-      item.append(media, link);
-      galleryList.appendChild(item);
-    }
+if (isVideo) {
+  // Open the video in Safari so iPhone users
+  // can use the Share menu to save it.
+  link.removeAttribute("download");
+  link.textContent = "▶ Open Video to Save";
+} else {
+  link.download = file.name;
+  link.textContent = "⬇ Download Photo";
+}
 
     galleryStatus.textContent =
       `${files.length} file(s) available. Enjoy your memories!`;
