@@ -188,19 +188,21 @@ async function takePhoto() {
     setStatus("Making your 3-photo collage...");
 
     /* Build a compact photo booth strip */
-const w = photos[0].width;
-const h = photos[0].height;
+const sourceWidth = photos[0].width;
+const sourceHeight = photos[0].height;
 
-// Smaller margins and gaps
-const margin = 16;
+// Match each photo to a smaller camera-preview-sized image
+const photoWidth = 360;
+const photoHeight = Math.round(
+  photoWidth * sourceHeight / sourceWidth
+);
+
+const margin = 12;
 const gap = 8;
-const footer = 100;
-
-// Each photo takes less vertical space
-const photoWidth = 480;
-const photoHeight = Math.round(photoWidth * h / w);
+const footer = 90;
 
 const collage = document.createElement("canvas");
+
 collage.width = photoWidth + margin * 2;
 collage.height =
   margin * 2 +
@@ -210,44 +212,52 @@ collage.height =
 
 const ctx = collage.getContext("2d");
 
+// Background
 ctx.fillStyle = "#FFF8F0";
 ctx.fillRect(0, 0, collage.width, collage.height);
 
+// Three resized photos
 photos.forEach((photo, i) => {
+  const y = margin + i * (photoHeight + gap);
+
   ctx.drawImage(
     photo,
+    0, 0,
+    sourceWidth,
+    sourceHeight,
     margin,
-    margin + i * (photoHeight + gap),
+    y,
     photoWidth,
     photoHeight
   );
 });
 
-// Compact footer
+// Footer
 ctx.textAlign = "center";
 ctx.textBaseline = "middle";
 
 const center = collage.width / 2;
-const footerTop = margin * 2 + photoHeight * 3 + gap * 2;
+const footerTop =
+  margin + photoHeight * 3 + gap * 2 + margin;
 
 ctx.fillStyle = "#C16E65";
-ctx.font = "bold 25px Arial";
-ctx.fillText("SNAP & SMILE", center, footerTop + 25);
+ctx.font = "bold 24px Arial";
+ctx.fillText("SNAP & SMILE", center, footerTop + 20);
 
 ctx.fillStyle = "#51413D";
-ctx.font = "bold 13px Arial";
+ctx.font = "bold 12px Arial";
 ctx.fillText(
   "THREE SHOTS. ONE MEMORY.",
   center,
-  footerTop + 52
+  footerTop + 46
 );
 
 ctx.fillStyle = "#8A7770";
-ctx.font = "11px Arial";
+ctx.font = "10px Arial";
 ctx.fillText(
   "PHOTO BOOTH • 2026",
   center,
-  footerTop + 76
+  footerTop + 68
 );
 
     const blob = await new Promise(resolve =>
