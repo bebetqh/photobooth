@@ -187,26 +187,50 @@ async function takePhoto() {
 
     setStatus("Making your 3-photo collage...");
 
-/* STORY-SIZE PHOTO BOOTH STRIP: 1080 x 1920 */
+/* RESIZABLE PHOTO STRIP — EACH PHOTO REMAINS 4:3 */
+
+// Change these two values to resize the whole strip
+const stripWidth = 200;
+const stripHeight = 150;
 
 const collage = document.createElement("canvas");
-collage.width = 1080;
-collage.height = 1920;
+collage.width = stripWidth;
+collage.height = stripHeight;
 
 const ctx = collage.getContext("2d");
 
 // Background
 ctx.fillStyle = "#FFF8F0";
-ctx.fillRect(0, 0, collage.width, collage.height);
+ctx.fillRect(0, 0, stripWidth, stripHeight);
 
-// Three 4:3 photos, sized to fit a Story
-const photoWidth = 960;
-const photoHeight = 720;
-const margin = 60;
+// Layout settings
+const margin = 20;
 const gap = 12;
-const footerTop = 1620;
+const footerHeight = 100;
 
-// Crop each image to 4:3, matching the camera preview
+// Calculate photo dimensions to fit the strip
+// while maintaining each photo's 4:3 ratio.
+const photoWidth = stripWidth - margin * 2;
+const photoHeight = photoWidth * 3 / 4;
+
+const availablePhotoHeight =
+  stripHeight - margin * 2 - footerHeight - gap * 2;
+
+const scale = Math.min(
+  1,
+  availablePhotoHeight / (photoHeight * 3)
+);
+
+const finalPhotoWidth = Math.round(photoWidth * scale);
+const finalPhotoHeight = Math.round(finalPhotoWidth * 3 / 4);
+
+const x = Math.round((stripWidth - finalPhotoWidth) / 2);
+const totalPhotosHeight =
+  finalPhotoHeight * 3 + gap * 2;
+
+const startY = margin;
+
+// Draw each photo with a centered 4:3 crop
 photos.forEach((photo, i) => {
   const sw = photo.width;
   const sh = photo.height;
@@ -229,35 +253,37 @@ photos.forEach((photo, i) => {
   ctx.drawImage(
     photo,
     sx, sy, sWidth, sHeight,
-    margin,
-    margin + i * (photoHeight + gap),
-    photoWidth,
-    photoHeight
+    x,
+    startY + i * (finalPhotoHeight + gap),
+    finalPhotoWidth,
+    finalPhotoHeight
   );
 });
 
-// Story-friendly footer
+// Footer positioned at the bottom
 ctx.textAlign = "center";
 ctx.textBaseline = "middle";
 
+const footerTop = stripHeight - footerHeight;
+
 ctx.fillStyle = "#C16E65";
-ctx.font = "bold 64px Arial";
-ctx.fillText("SNAP & SMILE", 540, footerTop + 60);
+ctx.font = `bold ${Math.max(18, stripWidth * 0.055)}px Arial`;
+ctx.fillText("SNAP & SMILE", stripWidth / 2, footerTop + 25);
 
 ctx.fillStyle = "#51413D";
-ctx.font = "bold 30px Arial";
+ctx.font = `bold ${Math.max(10, stripWidth * 0.027)}px Arial`;
 ctx.fillText(
   "THREE SHOTS. ONE MEMORY.",
-  540,
-  footerTop + 130
+  stripWidth / 2,
+  footerTop + 55
 );
 
 ctx.fillStyle = "#8A7770";
-ctx.font = "24px Arial";
+ctx.font = ` ${Math.max(9, stripWidth * 0.022)}px Arial`;
 ctx.fillText(
   "PHOTO BOOTH • 2026",
-  540,
-  footerTop + 185
+  stripWidth / 2,
+  footerTop + 80
 );
 
     const blob = await new Promise(resolve =>
