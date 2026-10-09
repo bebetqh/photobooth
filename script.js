@@ -407,6 +407,26 @@ function startRecording() {
   }
 }
 
+/* STOP VIDEO RECORDING */
+
+function stopRecording() {
+  if (!recorder || recorder.state === "inactive") {
+    return;
+  }
+
+  stopVideoButton.disabled = true;
+  setStatus("Preparing your mirrored video...");
+
+  try {
+    recorder.stop();
+  } catch (error) {
+    console.error("Could not stop recording:", error);
+
+    stopVideoButton.disabled = false;
+    setStatus("Could not stop recording. Please try again.");
+  }
+}
+
 // STEP 10: Upload media to Supabase.
 async function uploadMedia(blob, extension, contentType) {
   if (busy) return;
