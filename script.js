@@ -486,12 +486,26 @@ setStatus("Recording your wedding video...");
 }
 
 
-// STEP 9: Stop recording.
+// STEP 9: Stop the active video recording.
 
 function stopVideo() {
-  if (recorder && recorder.state === "recording") {
+  console.log("Stop Video button clicked.");
+
+  if (!recorder) {
+    setStatus("No recording was found.");
+    return;
+  }
+
+  if (recorder.state === "recording") {
+    setStatus("Stopping video and saving your recording...");
+
+    stopVideoButton.disabled = true;
     recorder.stop();
-    setStatus("Finishing your video...");
+
+  } else if (recorder.state === "inactive") {
+    setStatus("Recording has already stopped.");
+  } else {
+    setStatus("Please wait for the recording to finish.");
   }
 }
 
@@ -701,8 +715,16 @@ function showBooth() {
 // STEP 13: Attach event listeners.
 startCameraButton?.addEventListener("click", startCamera);
 takePhotoButton?.addEventListener("click", takePhoto);
-startVideoButton?.addEventListener("click", startVideo);
-stopVideoButton?.addEventListener("click", stopVideo);
+// 
+
+if (startVideoButton) {
+  startVideoButton.addEventListener("click", startVideo);
+}
+
+if (stopVideoButton) {
+  stopVideoButton.addEventListener("click", stopVideo);
+  stopVideoButton.disabled = true;
+}
 
 document.getElementById("openGallery")?.addEventListener(
   "click",
