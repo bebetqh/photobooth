@@ -463,10 +463,15 @@ function startVideo() {
 
     activeRecorder.start(1000);
 
-    startVideoButton.disabled = true;
-    stopVideoButton.disabled = false;
+startVideoButton.disabled = true;
+stopVideoButton.disabled = false;
 
-    setStatus("Recording your wedding video...");
+// Ensure the Stop button is visible during recording.
+stopVideoButton.hidden = false;
+stopVideoButton.style.display = "inline-block";
+stopVideoButton.style.visibility = "visible";
+
+setStatus("Recording your wedding video...");
 
   } catch (error) {
     console.error("Could not start recording:", error);

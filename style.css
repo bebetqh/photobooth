@@ -418,4 +418,15 @@ footer {
   .gallery-item {
     max-width: 320px;
   }
+
+  #stopVideo {
+  display: inline-block;
+  visibility: visible;
+  opacity: 1;
+}
+
+#stopVideo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 }
