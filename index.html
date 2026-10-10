@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,16 +68,13 @@
           <option value="10">10 seconds</option>
         </select>
 
-        <button id="takePhoto" class="button primary" type="button" disabled>
+        <button
+          id="takePhoto"
+          class="button primary"
+          type="button"
+          disabled
+        >
           📸 Take Photo
-        </button>
-
-        <button id="startVideo" type="button">
-          🎥 Record Video
-        </button>
-
-        <button id="stopVideo" type="button" disabled>
-          Stop Recording
         </button>
       </div>
 
@@ -84,34 +82,36 @@
         Tap Start Camera to begin.
       </p>
 
-      <!-- PHOTO AND VIDEO PREVIEW -->
+      <!-- PHOTO PREVIEW -->
       <div id="result" class="result hidden">
         <h2>Your memory is ready!</h2>
 
         <img
           id="photoPreview"
           class="preview hidden"
-          alt="Photo preview"
+          alt="Your wedding photostrip"
         >
 
-        <video
-          id="videoPreview"
-          class="preview hidden"
-          controls
-          playsinline
-        ></video>
+        <a
+          id="downloadPhoto"
+          class="button primary download-photo hidden"
+          href="#"
+          download="wedding-photostrip.jpg"
+        >
+          Download Your Photo
+        </a>
       </div>
 
       <!-- QR CODE -->
       <div id="qrPanel" class="qr-panel hidden">
-        <h2>Get your photos & videos</h2>
+        <h2>Get your photos</h2>
 
         <p>Scan this QR code with your phone to open your gallery.</p>
 
         <div id="qrcode"></div>
 
         <p class="small-text">
-          Keep this page open until your uploads finish.
+          Keep this page open until your upload finishes.
         </p>
       </div>
     </section>
@@ -123,10 +123,14 @@
       <h2>Your memories, all in one place.</h2>
 
       <p class="subtitle">
-        Tap a download link to save your files.
+        View and download your wedding photos.
       </p>
 
-      <p id="galleryStatus" role="status">
+      <button id="backToBooth" class="button secondary" type="button">
+        Back to Photo Booth
+      </button>
+
+      <p id="galleryStatus" role="status" aria-live="polite">
         Loading your gallery...
       </p>
 
