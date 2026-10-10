@@ -10,7 +10,7 @@ const SUPABASE_URL =
   "https://pyfxtjrgsychawdlohmw.supabase.co";
 
 const SUPABASE_KEY =
-  "sb_publishable_MOlIPBmHpblPoFpcSoAkXw_WbV-zS-Q";
+  "sb_publishable_MOlIPBmHpblPoFpcSoAkXw_WbV-z-SQ";
 
 const BUCKET = "booth-media";
 
