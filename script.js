@@ -14,9 +14,9 @@ const WEDDING_TAGLINE = "A DAY TO REMEMBER";
 const WEDDING_DATE = "08 AUGUST 2026";
 
 // GIF settings: shorter clips and reduced dimensions help keep files smaller.
-const CLIP_DURATION_MS = 1800;
-const GIF_WIDTH = 360;
-const GIF_FPS = 5;
+const CLIP_DURATION_MS = 1200;
+const GIF_WIDTH = 240;
+const GIF_FPS = 4;
 const GIF_DELAY = 1000 / GIF_FPS;
 
 if (!window.supabase) {
@@ -413,7 +413,7 @@ async function takePhoto() {
     const framesForEachPose = [];
     for (let i = 0; i < poseClips.length; i++) {
       setStatus(`Processing movement ${i + 1} of 3...`);
-      framesForEachPose.push(await extractClipFrames(poseClips[i], 8));
+      framesForEachPose.push(await extractClipFrames(poseClips[i], 5));
     }
 
     setStatus("Creating your animated GIF. This may take a moment...");
