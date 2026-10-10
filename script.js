@@ -355,7 +355,8 @@ async function takePhoto() {
   }
 }
 
-// STEP 8: Record a video using the camera.
+// STEP 8: Record and upload a video.
+
 function startVideo() {
   if (!cameraStream || recorder?.state === "recording") {
     return;
@@ -369,13 +370,12 @@ function startVideo() {
   try {
     recordedChunks = [];
 
-    // Try MP4 first, then WebM, depending on browser support.
+    // Prefer WebM for Chrome/Firefox; use MP4 if supported.
     const supportedTypes = [
-      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-      "video/mp4",
-      "video/webm;codecs=vp9,opus",
       "video/webm;codecs=vp8,opus",
-      "video/webm"
+      "video/webm;codecs=vp9,opus",
+      "video/webm",
+      "video/mp4"
     ];
 
     const mimeType = supportedTypes.find(type =>
@@ -386,30 +386,32 @@ function startVideo() {
       ? new MediaRecorder(cameraStream, { mimeType })
       : new MediaRecorder(cameraStream);
 
-    recorder.ondataavailable = event => {
+    const activeRecorder = recorder;
+
+    activeRecorder.ondataavailable = event => {
       if (event.data && event.data.size > 0) {
         recordedChunks.push(event.data);
       }
     };
 
-    recorder.onerror = event => {
-      console.error("Video recording error:", event.error);
-      setStatus("There was a problem recording the video.");
+    activeRecorder.onerror = event => {
+      console.error("Recording error:", event.error);
+      setStatus("Video recording failed. Please try again.");
+      startVideoButton.disabled = false;
+      stopVideoButton.disabled = true;
     };
 
-    recorder.onstop = async () => {
+    activeRecorder.onstop = async () => {
       try {
         const finalType =
-          recorder.mimeType ||
-          mimeType ||
-          "video/webm";
+          activeRecorder.mimeType || "video/webm";
 
         const videoBlob = new Blob(recordedChunks, {
           type: finalType
         });
 
         if (!videoBlob.size) {
-          throw new Error("The recorded video is empty.");
+          throw new Error("No video data was recorded.");
         }
 
         const extension = finalType.includes("mp4")
@@ -430,22 +432,24 @@ function startVideo() {
             upsert: false
           });
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
-        uploadedFiles++;
-
+        // Display the saved video.
         const { data } = db.storage
           .from(BUCKET)
           .getPublicUrl(path);
 
         if (videoPreview) {
           videoPreview.src = data.publicUrl;
+          videoPreview.controls = true;
           videoPreview.classList.remove("hidden");
+          videoPreview.load();
         }
 
-        setStatus("Your wedding video has been saved!");
+        setStatus(
+          "Video saved successfully! Open the gallery to download it."
+        );
+
       } catch (error) {
         console.error("Video upload error:", error);
         setStatus(
@@ -457,7 +461,7 @@ function startVideo() {
       }
     };
 
-    recorder.start(1000);
+    activeRecorder.start(1000);
 
     startVideoButton.disabled = true;
     stopVideoButton.disabled = false;
@@ -465,14 +469,20 @@ function startVideo() {
     setStatus("Recording your wedding video...");
 
   } catch (error) {
-    console.error("Could not start video recording:", error);
+    console.error("Could not start recording:", error);
+
     setStatus(
       `Could not start recording: ${error.message || error}`
     );
+
+    startVideoButton.disabled = false;
+    stopVideoButton.disabled = true;
   }
 }
 
+
 // STEP 9: Stop recording.
+
 function stopVideo() {
   if (recorder && recorder.state === "recording") {
     recorder.stop();
@@ -480,35 +490,31 @@ function stopVideo() {
   }
 }
 
-// STEP 10: Download or share a gallery file.
-// FIX: Try Supabase Storage download first, then the public URL.
+// STEP 10: Download a photo or video.
+
 async function saveGalleryFile(path, url, fileName, isVideo) {
-  let blob = null;
+  if (!galleryStatus) return;
 
   try {
     galleryStatus.textContent = "Preparing your download...";
 
-    // First try downloading directly from Supabase Storage.
+    let blob;
+    let downloadName = fileName;
+
+    // First try Supabase Storage.
     const { data, error } = await db.storage
       .from(BUCKET)
       .download(path);
 
-    if (!error && data) {
+    if (!error && data && data.size > 0) {
       blob = data;
     } else {
-      console.warn(
-        "Supabase Storage download failed; trying public URL:",
-        error
-      );
-    }
-
-    // Fallback: fetch the public URL.
-    if (!blob) {
+      // Fallback to the public URL.
       const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error(
-          `Download failed with HTTP ${response.status}`
+          `Could not retrieve file: HTTP ${response.status}`
         );
       }
 
@@ -519,81 +525,50 @@ async function saveGalleryFile(path, url, fileName, isVideo) {
       throw new Error("The downloaded file is empty.");
     }
 
-    // Use the real file MIME type where possible.
-    const mimeType = blob.type ||
-      (isVideo ? "video/mp4" : "image/jpeg");
+    // Ensure the downloaded file has the right extension.
+    if (isVideo && !/\.(mp4|webm|mov|m4v|ogg)$/i.test(downloadName)) {
+      const extension = blob.type.includes("mp4")
+        ? "mp4"
+        : "webm";
 
-    const downloadBlob = new Blob([blob], {
-      type: mimeType
-    });
-
-    // Try the device share sheet on supported phones.
-    const file = new File(
-      [downloadBlob],
-      fileName,
-      { type: mimeType }
-    );
-
-    if (
-      navigator.canShare &&
-      navigator.canShare({ files: [file] }) &&
-      navigator.share
-    ) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: isVideo
-            ? "Save Wedding Video"
-            : "Save Wedding Photo"
-        });
-
-        galleryStatus.textContent = "File shared successfully.";
-        return;
-      } catch (shareError) {
-        // If the user cancels sharing, do not force a second download.
-        if (shareError.name === "AbortError") {
-          galleryStatus.textContent = "Sharing cancelled.";
-          return;
-        }
-
-        console.warn(
-          "Sharing unavailable; using browser download:",
-          shareError
-        );
-      }
+      downloadName = `${downloadName}.${extension}`;
     }
 
-    // Standard browser download fallback.
-    const objectUrl = URL.createObjectURL(downloadBlob);
+    const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
 
     link.href = objectUrl;
-    link.download = fileName;
+    link.download = downloadName;
     link.style.display = "none";
 
     document.body.appendChild(link);
     link.click();
     link.remove();
 
-    // Give the browser time to begin the download before cleanup.
+    // Release the temporary download URL later.
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
 
-    galleryStatus.textContent = "Your download should begin shortly.";
+    galleryStatus.textContent =
+      "Download started. Check your Downloads folder.";
 
   } catch (error) {
     console.error("Gallery download error:", error);
 
-    // Last resort: open the public URL in a new tab.
-    if (url) {
-      const openLink = document.createElement("a");
-      openLink.href = url;
-      openLink.target = "_blank";
-      openLink.rel = "noopener noreferrer";
-      openLink.click();
-    }
-
     galleryStatus.textContent =
-      `Download failed: ${error.message || error}. Check storage permissions.`;
+      `Download failed: ${error.message || error}.`;
+
+    // Let the user open the original file as a fallback.
+    if (url) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Open video";
+      link.style.display = "inline-block";
+
+      galleryStatus.appendChild(document.createTextNode(" "));
+      galleryStatus.appendChild(link);
+    }
   }
 }
 
