@@ -120,6 +120,7 @@ h1 span {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   transform: scaleX(-1);
   -webkit-transform: scaleX(-1);
 }
@@ -253,7 +254,8 @@ button:disabled {
   display: block;
   width: 100%;
   max-width: 420px;
-  max-height: 520px;
+  /* max-height: 520px; */
+  /* aspect-ratio: 4 / 3; */
   height: auto;
   margin: 22px auto;
   border-radius: 3px;
@@ -328,7 +330,7 @@ button:disabled {
 .gallery-item img {
   display: block;
   width: 100%;
-  max-width: 100%;
+  /* max-width: 100%; */
   height: auto;
   margin: 0 auto 16px;
   border-radius: 2px;

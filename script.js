@@ -211,33 +211,49 @@ async function takePhoto() {
 
       const canvas = document.createElement("canvas");
 
-      canvas.width = camera.videoWidth;
-      canvas.height = camera.videoHeight;
+const sourceWidth = camera.videoWidth;
+const sourceHeight = camera.videoHeight;
 
-      const context = canvas.getContext("2d", {
-        alpha: false
-      });
+// Match the camera preview's 4:3 ratio.
+const previewRatio = 4 / 3;
 
-      if (!context) {
-        throw new Error("Could not create the photo canvas.");
-      }
+canvas.width = 1200;
+canvas.height = 900;
 
-      // Mirror the image to match the selfie preview.
-      context.save();
-      context.translate(canvas.width, 0);
-      context.scale(-1, 1);
+const context = canvas.getContext("2d", {
+  alpha: false
+});
 
-      context.drawImage(
-        camera,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
+if (!context) {
+  throw new Error("Could not create the photo canvas.");
+}
 
-      context.restore();
+// Calculate the center crop, matching object-fit: cover.
+const sourceRatio = sourceWidth / sourceHeight;
+let sx = 0;
+let sy = 0;
+let sw = sourceWidth;
+let sh = sourceHeight;
 
-      photos.push(canvas);
+if (sourceRatio > previewRatio) {
+  sw = sourceHeight * previewRatio;
+  sx = (sourceWidth - sw) / 2;
+} else {
+  sh = sourceWidth / previewRatio;
+  sy = (sourceHeight - sh) / 2;
+}
+
+// Mirror the captured photo like the selfie preview.
+context.translate(canvas.width, 0);
+context.scale(-1, 1);
+
+context.drawImage(
+  camera,
+  sx, sy, sw, sh,
+  0, 0, canvas.width, canvas.height
+);
+
+photos.push(canvas);
 
       if (i < 2) {
         setStatus(`Photo ${i + 1} captured!`);
