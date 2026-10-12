@@ -502,7 +502,7 @@ photos.push(canvas);
 
     ctx.fillText(
 
-      "08 AUGUST 2026",
+      "08 November 2026",
 
       collage.width / 2,
 
